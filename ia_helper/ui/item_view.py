@@ -401,8 +401,11 @@ class ItemView(Adw.NavigationPage):
 
     def _set_all_selected(self, selected: bool):
         for row in self._visible_rows():
-            if selected and row.entry.private:
-                continue  # restricted files are never selectable
+            # Select all skips restricted files (never selectable) and DRM
+            # containers (selectable, but only by an explicit individual
+            # tick). Select none clears everything, including DRM files.
+            if selected and (row.entry.private or row.entry.drm):
+                continue
             row.selected = selected
 
     def _update_selection_summary(self):
