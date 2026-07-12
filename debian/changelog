@@ -1,0 +1,8 @@
+ia-helper (0.4.0) unstable; urgency=medium
+
+  * Milestone 4: packaging.
+  * Flatpak: pinned Python dependency module committed, so flatpak-builder
+    works out of the box.
+  * Debian packaging (this directory) targeting Ubuntu 26.04+.
+
+ -- Joe Hallmark <joe.hallmark@gmail.com>  Mon, 13 Jul 2026 12:00:00 +1200

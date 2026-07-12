@@ -1,0 +1,27 @@
+Source: ia-helper
+Section: net
+Priority: optional
+Maintainer: Joe Hallmark <joe.hallmark@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+               dh-python,
+               python3-all,
+               python3-setuptools,
+               pybuild-plugin-pyproject
+Standards-Version: 4.6.2
+Homepage: https://github.com/stargazerNZ/ia_helper
+Rules-Requires-Root: no
+
+Package: ia-helper
+Architecture: all
+Depends: ${misc:Depends},
+         ${python3:Depends},
+         python3-gi,
+         gir1.2-gtk-4.0,
+         gir1.2-adw-1,
+         python3-internetarchive (>= 4.1)
+Description: GTK4 helper for the Internet Archive
+ IA Helper simplifies searching for and downloading items, collections,
+ and lists from the Internet Archive (archive.org), operating within the
+ Archive's usage guidelines: it identifies itself, limits concurrent
+ connections, verifies downloads against published checksums, and honors
+ access restrictions on lending-library material.

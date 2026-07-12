@@ -7,7 +7,7 @@ operating within the Archive's
 it identifies itself with a descriptive User-Agent, limits concurrent
 connections, and caches thumbnails and metadata locally.
 
-**Status: Milestone 3** — working download manager.
+**Status: Milestone 4** — packaging (Flatpak and .deb).
 
 ## Roadmap
 
@@ -15,8 +15,8 @@ connections, and caches thumbnails and metadata locally.
 |---|---|
 | M1 ✓ | Walking skeleton: window, search, results list, thumbnails, paging |
 | M2 ✓ | Item view: metadata, file list with selection, "Member of" collections/lists |
-| **M3 (this)** | Download manager: queue, progress, pause/resume, checksum verification |
-| M4 | Packaging: Flatpak (primary), .deb (secondary) |
+| M3 ✓ | Download manager: queue, progress, pause/resume, checksum verification |
+| **M4 (this)** | Packaging: Flatpak (primary), .deb (secondary) |
 | M5 | Polish: error states, keyboard navigation, Flathub submission |
 
 Parked for post-MVP: query-based "sets of items" bulk downloads (Scrape API),
@@ -97,17 +97,17 @@ python -m unittest discover tests
 
 ## Building the Flatpak
 
-The manifest is [build-aux/flatpak/io.github.stargazernz.IAHelper.json](build-aux/flatpak/io.github.stargazernz.IAHelper.json).
-Flatpak builds are offline, so the Python dependencies must first be pinned
-into a generated module (one-time step, repeat when deps change):
+The manifest is [build-aux/flatpak/io.github.stargazernz.IAHelper.json](build-aux/flatpak/io.github.stargazernz.IAHelper.json);
+the Python dependencies are pinned in the committed
+`python3-internetarchive.json` module (regenerate with
+`python3 build-aux/flatpak/update-python-deps.py` when deps change), so the
+build works out of the box:
 
 ```sh
-pip install requirements-parser  # needed by the generator
-curl -LO https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/pip/flatpak-pip-generator
-python3 flatpak-pip-generator --requirements-file=requirements.txt \
-    --output build-aux/flatpak/python3-internetarchive
-
+sudo apt install flatpak flatpak-builder
+flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 flatpak install flathub org.gnome.Platform//48 org.gnome.Sdk//48
+
 flatpak-builder --user --install --force-clean flatpak-build \
     build-aux/flatpak/io.github.stargazernz.IAHelper.json
 flatpak run io.github.stargazernz.IAHelper
@@ -116,10 +116,24 @@ flatpak run io.github.stargazernz.IAHelper
 Sandbox permissions requested: network, `xdg-download` (default download
 location), and display/GPU sockets — nothing else.
 
+## Building the .deb
+
+Debian packaging lives in `debian/` (native package, targets Ubuntu 26.04+
+where `python3-internetarchive` is in universe):
+
+```sh
+sudo apt install devscripts debhelper dh-python python3-all \
+    python3-setuptools pybuild-plugin-pyproject
+dpkg-buildpackage -us -uc -b
+sudo apt install ../ia-helper_*.deb
+```
+
 ## Before publishing
 
 - [ ] Confirm the app ID (`io.github.stargazernz.IAHelper` assumes the code
       lives at github.com/stargazerNZ/ia_helper) — it must match your repo
       host for Flathub verification.
-- [ ] Choose a license (metainfo currently says GPL-3.0-or-later as a placeholder).
+- [ ] Choose a license (metainfo and debian/copyright currently say
+      GPL-3.0-or-later as a placeholder; add a LICENSE file to match).
 - [ ] Replace the placeholder icon in `data/icons/`.
+- [ ] Add screenshots to the metainfo (required for Flathub).
