@@ -108,6 +108,21 @@ class TestParseItem(unittest.TestCase):
         payload = {"metadata": {"identifier": "x"}, "nodownload": True}
         self.assertTrue(parse_item(payload).access_restricted)
 
+    def test_drm_formats_flagged(self):
+        # Format values observed live on lending-library books.
+        for fmt in ("ACS Encrypted PDF", "ACS Encrypted EPUB",
+                    "LCP Encrypted PDF", "LCP Encrypted EPUB"):
+            payload = {
+                "metadata": {"identifier": "book"},
+                "files": [{"name": "f", "format": fmt}],
+            }
+            self.assertTrue(parse_item(payload).files[0].drm, fmt)
+        payload = {
+            "metadata": {"identifier": "book"},
+            "files": [{"name": "f", "format": "Text PDF"}],
+        }
+        self.assertFalse(parse_item(payload).files[0].drm)
+
     def test_private_files(self):
         payload = {
             "metadata": {"identifier": "book"},

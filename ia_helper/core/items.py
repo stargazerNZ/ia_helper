@@ -65,6 +65,13 @@ class FileEntry:
     def is_original(self) -> bool:
         return self.source == "original"
 
+    @property
+    def drm(self) -> bool:
+        """DRM-protected lending container (e.g. "ACS Encrypted PDF",
+        "LCP Encrypted EPUB"). Downloadable, but only openable with an
+        active archive.org loan and a compatible reader."""
+        return "encrypted" in self.format.lower()
+
 
 @dataclass
 class SimpleListMembership:

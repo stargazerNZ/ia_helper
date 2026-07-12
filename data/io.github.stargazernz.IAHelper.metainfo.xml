@@ -18,6 +18,13 @@
   <url type="homepage">https://github.com/stargazerNZ/ia_helper</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.3.2" date="2026-07-13">
+      <description>
+        <p>Label DRM-protected lending files (ACS/LCP encrypted PDF and EPUB)
+        in the file list so downloads that need a loan to open aren't a
+        surprise.</p>
+      </description>
+    </release>
     <release version="0.3.1" date="2026-07-13">
       <description>
         <p>Honor access restrictions: restricted items (e.g. lending-library

@@ -293,9 +293,20 @@ class ItemView(Adw.NavigationPage):
             label.set_tooltip_text(row.entry.name)
 
     def _bind_format(self, label, row: FileRow):
-        label.set_label(
-            f"{row.entry.format} · restricted" if row.entry.private else row.entry.format
-        )
+        entry = row.entry
+        # Rows are recycled: label and tooltip must be set on every bind.
+        if entry.private:
+            label.set_label(f"{entry.format} · restricted")
+            label.set_tooltip_text(None)
+        elif entry.drm:
+            label.set_label(f"{entry.format} · DRM")
+            label.set_tooltip_text(
+                "DRM-protected — requires an active archive.org loan and a "
+                "compatible reader (e.g. Adobe Digital Editions) to open"
+            )
+        else:
+            label.set_label(entry.format)
+            label.set_tooltip_text(None)
 
     def _bind_size(self, label, row: FileRow):
         label.set_label(format_size(row.entry.size) if row.entry.size else "")
