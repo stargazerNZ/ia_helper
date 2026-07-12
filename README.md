@@ -7,14 +7,15 @@ operating within the Archive's
 it identifies itself with a descriptive User-Agent, limits concurrent
 connections, and caches thumbnails and metadata locally.
 
-**Status: Milestone 1** — search with mediatype filter, thumbnails, and paging.
+**Status: Milestone 2** — item view with metadata, file selection, and
+grouping memberships.
 
 ## Roadmap
 
 | Milestone | Scope |
 |---|---|
-| **M1 (this)** | Walking skeleton: window, search, results list, thumbnails, paging |
-| M2 | Item view: metadata, file list with selection, "Member of" collections/lists |
+| M1 ✓ | Walking skeleton: window, search, results list, thumbnails, paging |
+| **M2 (this)** | Item view: metadata, file list with selection, "Member of" collections/lists |
 | M3 | Download manager: queue, progress, pause/resume, checksum verification |
 | M4 | Packaging: Flatpak (primary), .deb (secondary) |
 | M5 | Polish: error states, keyboard navigation, Flathub submission |
@@ -30,11 +31,14 @@ ia_helper/
     api.py         # shared session, User-Agent, connection budget
     search.py      # advancedsearch.php client, query builder (collections,
                    # simple lists, favorites are all just query forms)
+    items.py       # Item Metadata API: full record, file list, simplelists
     thumbnails.py  # thumbnail fetch + on-disk cache
   ui/            # GTK4/libadwaita — libadwaita kept to layout chrome only,
                  # so a future Windows build can swap it out
-    window.py
+    window.py      # NavigationView, shared session/clients, view wiring
     search_view.py
+    item_view.py   # metadata, "Member of" chips, file list with selection
+    format.py
     worker.py      # thread → GLib.idle_add bridge
   main.py        # Adw.Application entry point
 ```

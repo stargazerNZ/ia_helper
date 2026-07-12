@@ -18,6 +18,12 @@
   <url type="homepage">https://github.com/stargazerNZ/ia_helper</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.2.0" date="2026-07-12">
+      <description>
+        <p>Milestone 2: item view with metadata, description, collection and
+        simple-list memberships, and a file list with selection.</p>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-07-12">
       <description>
         <p>Milestone 1: search with mediatype filter, thumbnails, paging.</p>

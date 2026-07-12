@@ -2,21 +2,11 @@
 
 from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, Pango
 
-from ..core.api import create_session
-from ..core.search import MEDIATYPES, SearchClient, SearchQuery, SearchResult
-from ..core.thumbnails import ThumbnailLoader
+from ..core.search import MEDIATYPES, SearchQuery, SearchResult
+from .format import format_size
 from .worker import run_in_thread
 
 THUMB_SIZE = 64
-
-
-def format_size(num_bytes: int) -> str:
-    size = float(num_bytes)
-    for unit in ("B", "KB", "MB", "GB", "TB"):
-        if size < 1024 or unit == "TB":
-            return f"{size:.0f} {unit}" if unit == "B" else f"{size:.1f} {unit}"
-        size /= 1024
-    return ""
 
 
 class ResultItem(GObject.Object):
@@ -28,13 +18,13 @@ class ResultItem(GObject.Object):
 
 
 class SearchView(Gtk.Box):
-    def __init__(self, on_error):
+    def __init__(self, client, thumbs, on_error, on_item_activated):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self._on_error = on_error
+        self._on_item_activated = on_item_activated
 
-        session = create_session()
-        self._client = SearchClient(session)
-        self._thumbs = ThumbnailLoader(session)
+        self._client = client
+        self._thumbs = thumbs
 
         # Monotonic token: results from a superseded search are dropped.
         self._search_token = 0
@@ -94,8 +84,10 @@ class SearchView(Gtk.Box):
         self._list_view = Gtk.ListView(
             model=Gtk.NoSelection(model=self._store),
             factory=factory,
+            single_click_activate=True,
         )
         self._list_view.add_css_class("navigation-sidebar")
+        self._list_view.connect("activate", self._on_row_activated)
 
         self._empty_page = Adw.StatusPage(
             title="Search the Internet Archive",
@@ -209,6 +201,20 @@ class SearchView(Gtk.Box):
         row.picture.set_paintable(texture)
 
     # -- searching -----------------------------------------------------
+
+    def _on_row_activated(self, _list_view, position):
+        item = self._store.get_item(position)
+        if item is not None:
+            self._on_item_activated(item.result)
+
+    def run_query_text(self, query_text: str):
+        """Run a raw Lucene query (used for collection/list browsing).
+
+        The query is placed in the entry so the user can see and refine it.
+        """
+        self._entry.set_text(query_text)
+        self._mediatype_dropdown.set_selected(0)
+        self._start_search()
 
     def _selected_mediatype(self):
         return MEDIATYPES[self._mediatype_dropdown.get_selected()][1]
