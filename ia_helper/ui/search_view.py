@@ -228,6 +228,9 @@ class SearchView(Gtk.Box):
             return
 
         self._current_query = SearchQuery(text=text, mediatype=mediatype)
+        # Drop thumbnail fetches still queued for the previous result set,
+        # or the new results' thumbnails wait in line behind them.
+        self._thumbs.cancel_pending()
         self._store.remove_all()
         self._current_page = None
         self._status_label.set_label("")

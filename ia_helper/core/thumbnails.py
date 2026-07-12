@@ -31,14 +31,26 @@ class ThumbnailLoader:
         self.cache_dir = cache_dir or default_cache_dir()
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
+        # Jobs are stamped with the generation current at submit time; a
+        # worker picking up a stale-generation job drops it immediately.
+        # Without this, thumbnails queued while browsing one result set
+        # would still be downloaded after a new search, and the new
+        # search's thumbnails would crawl through the queue behind them.
+        self._generation = 0
 
     def fetch(self, identifier: str, callback) -> None:
         """Fetch a thumbnail asynchronously.
 
         ``callback(identifier, data_or_none)`` runs on a worker thread —
         UI callers must trampoline back to the main loop themselves.
+        Jobs still pending when cancel_pending() is called are dropped
+        without invoking the callback.
         """
-        self._executor.submit(self._fetch, identifier, callback)
+        self._executor.submit(self._fetch, self._generation, identifier, callback)
+
+    def cancel_pending(self) -> None:
+        """Drop queued-but-not-started fetches (e.g. on a new search)."""
+        self._generation += 1
 
     def shutdown(self) -> None:
         self._executor.shutdown(wait=False, cancel_futures=True)
@@ -46,7 +58,9 @@ class ThumbnailLoader:
     def _cache_path(self, identifier: str) -> Path:
         return self.cache_dir / (_SAFE_CHARS.sub("_", identifier) + ".img")
 
-    def _fetch(self, identifier: str, callback) -> None:
+    def _fetch(self, generation: int, identifier: str, callback) -> None:
+        if generation != self._generation:
+            return  # stale job from a superseded result set
         data: bytes | None = None
         try:
             path = self._cache_path(identifier)

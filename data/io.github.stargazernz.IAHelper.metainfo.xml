@@ -18,6 +18,13 @@
   <url type="homepage">https://github.com/stargazerNZ/ia_helper</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.3.4" date="2026-07-13">
+      <description>
+        <p>Fix slow thumbnails on repeat searches: stale thumbnail fetches
+        from the previous result set are now dropped instead of blocking
+        the new ones.</p>
+      </description>
+    </release>
     <release version="0.3.3" date="2026-07-13">
       <description>
         <p>"Select all" now skips DRM-protected lending files; they remain
