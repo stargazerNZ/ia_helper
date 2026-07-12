@@ -30,6 +30,7 @@ RESULT_FIELDS = [
     "mediatype",
     "item_size",
     "downloads",
+    "access-restricted-item",
 ]
 
 # (label, mediatype value) pairs for the UI filter. None = no filter.
@@ -80,6 +81,8 @@ class SearchResult:
     mediatype: str = ""
     item_size: int = 0
     downloads: int = 0
+    # Lending-library and similar items: viewable via IA, not downloadable.
+    access_restricted: bool = False
 
     @property
     def is_collection(self) -> bool:
@@ -107,6 +110,13 @@ def _as_text(value) -> str:
     return str(value)
 
 
+def _as_bool(value) -> bool:
+    """IA boolean flags arrive as True, "true", or are absent entirely."""
+    if isinstance(value, str):
+        return value.strip().lower() == "true"
+    return bool(value)
+
+
 def parse_doc(doc: dict) -> SearchResult:
     identifier = doc.get("identifier", "")
     return SearchResult(
@@ -117,6 +127,7 @@ def parse_doc(doc: dict) -> SearchResult:
         mediatype=_as_text(doc.get("mediatype")),
         item_size=int(doc.get("item_size") or 0),
         downloads=int(doc.get("downloads") or 0),
+        access_restricted=_as_bool(doc.get("access-restricted-item")),
     )
 
 

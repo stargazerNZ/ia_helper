@@ -42,6 +42,13 @@ def _as_text(value, separator: str = ", ") -> str:
     return separator.join(_as_list(value))
 
 
+def _as_bool(value) -> bool:
+    """IA boolean flags arrive as True, "true", or are absent entirely."""
+    if isinstance(value, str):
+        return value.strip().lower() == "true"
+    return bool(value)
+
+
 @dataclass
 class FileEntry:
     name: str
@@ -50,6 +57,9 @@ class FileEntry:
     md5: str = ""
     # archive.org marks each file "original", "derivative", or "metadata".
     source: str = ""
+    # private=true files (e.g. lending-library book content) are not
+    # downloadable; the download endpoint returns 403 for them.
+    private: bool = False
 
     @property
     def is_original(self) -> bool:
@@ -83,6 +93,9 @@ class ItemDetails:
     item_size: int = 0
     files_count: int = 0
     is_dark: bool = False
+    # Lending-library and similar items (access-restricted-item metadata
+    # flag): viewable on archive.org, but their content files are private.
+    access_restricted: bool = False
 
     @property
     def is_collection(self) -> bool:
@@ -96,6 +109,7 @@ def parse_file(raw: dict) -> FileEntry:
         format=str(raw.get("format", "")),
         md5=str(raw.get("md5", "")),
         source=str(raw.get("source", "")),
+        private=_as_bool(raw.get("private")),
     )
 
 
@@ -123,7 +137,11 @@ def parse_item(payload: dict) -> ItemDetails:
         files=[parse_file(f) for f in payload.get("files") or []],
         item_size=int(payload.get("item_size") or 0),
         files_count=int(payload.get("files_count") or 0),
-        is_dark=bool(payload.get("is_dark")),
+        is_dark=_as_bool(payload.get("is_dark")),
+        access_restricted=(
+            _as_bool(metadata.get("access-restricted-item"))
+            or _as_bool(payload.get("nodownload"))
+        ),
     )
 
 

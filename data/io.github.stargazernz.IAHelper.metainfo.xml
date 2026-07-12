@@ -18,6 +18,13 @@
   <url type="homepage">https://github.com/stargazerNZ/ia_helper</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.3.1" date="2026-07-13">
+      <description>
+        <p>Honor access restrictions: restricted items (e.g. lending-library
+        books) are flagged in search and on the item page, and their private
+        files cannot be selected or downloaded.</p>
+      </description>
+    </release>
     <release version="0.3.0" date="2026-07-12">
       <description>
         <p>Milestone 3: download manager with queue, pause/resume, checksum

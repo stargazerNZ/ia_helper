@@ -95,6 +95,31 @@ class TestParseItem(unittest.TestCase):
         payload = {"metadata": {"identifier": "dark-item"}, "is_dark": True}
         self.assertTrue(parse_item(payload).is_dark)
 
+    def test_access_restricted_item(self):
+        # Flag arrives as the string "true" in item metadata (observed live
+        # on lending-library books, e.g. collection:inlibrary).
+        payload = {
+            "metadata": {"identifier": "book", "access-restricted-item": "true"}
+        }
+        self.assertTrue(parse_item(payload).access_restricted)
+        self.assertFalse(parse_item({"metadata": {"identifier": "x"}}).access_restricted)
+
+    def test_nodownload_counts_as_restricted(self):
+        payload = {"metadata": {"identifier": "x"}, "nodownload": True}
+        self.assertTrue(parse_item(payload).access_restricted)
+
+    def test_private_files(self):
+        payload = {
+            "metadata": {"identifier": "book"},
+            "files": [
+                {"name": "book.pdf", "source": "derivative", "private": "true"},
+                {"name": "__ia_thumb.jpg", "source": "original"},
+            ],
+        }
+        files = parse_item(payload).files
+        self.assertTrue(files[0].private)
+        self.assertFalse(files[1].private)
+
 
 class TestParseSimplelists(unittest.TestCase):
     def test_docs_example(self):

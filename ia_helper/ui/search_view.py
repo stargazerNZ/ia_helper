@@ -180,6 +180,8 @@ class SearchView(Gtk.Box):
         detail_bits = [result.mediatype, result.identifier]
         if result.item_size:
             detail_bits.append(format_size(result.item_size))
+        if result.access_restricted:
+            detail_bits.append("access-restricted")
         row.detail.set_label(" · ".join(b for b in detail_bits if b))
 
         # Rows are recycled: tag with the identifier so a slow thumbnail for

@@ -86,7 +86,15 @@ class ItemView(Adw.NavigationPage):
         clamp = Adw.Clamp(maximum_size=900, child=self._content_box)
         scroller = Gtk.ScrolledWindow(vexpand=True)
         scroller.set_child(clamp)
-        return scroller
+
+        self._restricted_banner = Adw.Banner(
+            title="Access-restricted item — its content files can only be "
+                  "borrowed on archive.org, not downloaded."
+        )
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        page.append(self._restricted_banner)
+        page.append(scroller)
+        return page
 
     def _build_header(self):
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=18)
@@ -235,6 +243,12 @@ class ItemView(Adw.NavigationPage):
         def bind(_factory, list_item):
             check = list_item.get_child()
             row: FileRow = list_item.get_item()
+            check.set_sensitive(not row.entry.private)
+            check.set_tooltip_text(
+                "This file is access-restricted and cannot be downloaded"
+                if row.entry.private
+                else None
+            )
             binding = row.bind_property(
                 "selected",
                 check,
@@ -270,10 +284,18 @@ class ItemView(Adw.NavigationPage):
 
     def _bind_name(self, label, row: FileRow):
         label.set_label(row.entry.name)
-        label.set_tooltip_text(row.entry.name)
+        # Rows are recycled: state must be set both ways on every bind.
+        if row.entry.private:
+            label.add_css_class("dim-label")
+            label.set_tooltip_text(f"{row.entry.name} (access-restricted)")
+        else:
+            label.remove_css_class("dim-label")
+            label.set_tooltip_text(row.entry.name)
 
     def _bind_format(self, label, row: FileRow):
-        label.set_label(row.entry.format)
+        label.set_label(
+            f"{row.entry.format} · restricted" if row.entry.private else row.entry.format
+        )
 
     def _bind_size(self, label, row: FileRow):
         label.set_label(format_size(row.entry.size) if row.entry.size else "")
@@ -309,6 +331,7 @@ class ItemView(Adw.NavigationPage):
             self._description_label.set_visible(True)
 
         self._browse_collection_button.set_visible(details.is_collection)
+        self._restricted_banner.set_revealed(details.access_restricted)
 
         for collection in details.collections:
             self._add_chip(collection, f"collection:{collection}")
@@ -367,6 +390,8 @@ class ItemView(Adw.NavigationPage):
 
     def _set_all_selected(self, selected: bool):
         for row in self._visible_rows():
+            if selected and row.entry.private:
+                continue  # restricted files are never selectable
             row.selected = selected
 
     def _update_selection_summary(self):

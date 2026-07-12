@@ -150,6 +150,14 @@ class TestQueueBehaviour(unittest.TestCase):
     def tearDown(self):
         self._tmpdir.cleanup()
 
+    def test_private_files_never_enqueued(self):
+        manager = make_manager(self.tmp)
+        private_entry = FileEntry(
+            name="book.pdf", size=100, md5="x", source="derivative", private=True
+        )
+        created = manager.enqueue("book", [private_entry, entry(name="thumb.jpg")])
+        self.assertEqual([t.file_name for t in created], ["thumb.jpg"])
+
     def test_unsafe_names_are_skipped_not_fatal(self):
         manager = make_manager(self.tmp)
         created = manager.enqueue(

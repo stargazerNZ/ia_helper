@@ -153,6 +153,11 @@ class DownloadManager:
                 t.dest for t in self._tasks if t.state not in FINISHED_STATES
             }
             for entry in entries:
+                if entry.private:
+                    # Access-restricted file: the download endpoint would
+                    # return 403. The UI never offers these, but enforce it
+                    # here too so no code path can queue one.
+                    continue
                 try:
                     relative = safe_relative_path(entry.name)
                 except ValueError:

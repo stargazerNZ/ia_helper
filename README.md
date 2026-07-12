@@ -56,6 +56,12 @@ IA groupings the app understands (all resolve to search queries):
 
 ## Downloads
 
+Access-restricted items (the `access-restricted-item` flag — e.g. controlled
+digital lending books) are labelled in search results and get a banner on the
+item page; their `private` files are shown but cannot be selected, and the
+download manager refuses to queue them. This honors the Archive's terms for
+lending material — such items can be borrowed on archive.org, not downloaded.
+
 Files download to `<download dir>/<identifier>/<file>` (default: your XDG
 download directory), streaming into a `.part` file that is renamed into place
 only after the size and MD5 checks pass. Interrupted downloads resume with

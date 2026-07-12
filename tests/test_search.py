@@ -55,6 +55,13 @@ class TestParseDoc(unittest.TestCase):
         result = parse_doc({"identifier": "nasa", "mediatype": "collection"})
         self.assertTrue(result.is_collection)
 
+    def test_access_restricted_flag(self):
+        # The field arrives as the string "true" (observed live) — and must
+        # default to False when absent.
+        result = parse_doc({"identifier": "x", "access-restricted-item": "true"})
+        self.assertTrue(result.access_restricted)
+        self.assertFalse(parse_doc({"identifier": "x"}).access_restricted)
+
 
 class TestSearchPage(unittest.TestCase):
     def test_has_more(self):
