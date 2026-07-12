@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Placeholder icon: a stylized archive building with a download arrow.
+     Replace with a real icon before publishing. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect x="8" y="8" width="112" height="112" rx="20" fill="#241f31"/>
+  <!-- pediment -->
+  <path d="M 24 44 L 64 22 L 104 44 Z" fill="#f6f5f4"/>
+  <!-- columns -->
+  <rect x="30" y="50" width="10" height="36" fill="#f6f5f4"/>
+  <rect x="52" y="50" width="10" height="36" fill="#f6f5f4"/>
+  <rect x="74" y="50" width="10" height="36" fill="#f6f5f4"/>
+  <rect x="88" y="50" width="10" height="36" fill="#f6f5f4"/>
+  <!-- base -->
+  <rect x="24" y="92" width="80" height="10" fill="#f6f5f4"/>
+  <!-- download arrow -->
+  <g transform="translate(84,84)">
+    <circle cx="0" cy="0" r="22" fill="#3584e4"/>
+    <path d="M 0 -12 L 0 6 M -8 -2 L 0 8 L 8 -2" stroke="#ffffff" stroke-width="5"
+          stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+</svg>

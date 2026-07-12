@@ -1,0 +1,68 @@
+"""Core search tests — no network, no GTK. Run with: python -m unittest discover tests"""
+
+import unittest
+
+from ia_helper.core.search import SearchPage, SearchQuery, parse_doc
+
+
+class TestSearchQuery(unittest.TestCase):
+    def test_text_only(self):
+        self.assertEqual(SearchQuery(text="apollo 11").to_lucene(), "(apollo 11)")
+
+    def test_text_and_mediatype(self):
+        query = SearchQuery(text="apollo", mediatype="movies")
+        self.assertEqual(query.to_lucene(), "(apollo) AND mediatype:movies")
+
+    def test_collection(self):
+        query = SearchQuery(collection="nasa")
+        self.assertEqual(query.to_lucene(), "collection:nasa")
+
+    def test_simplelist(self):
+        query = SearchQuery(simplelist=("some-parent", "mylist"))
+        self.assertEqual(query.to_lucene(), "simplelists__mylist:some-parent")
+
+    def test_empty_query_rejected(self):
+        with self.assertRaises(ValueError):
+            SearchQuery(text="   ").to_lucene()
+
+
+class TestParseDoc(unittest.TestCase):
+    def test_full_doc(self):
+        doc = {
+            "identifier": "apollo11-video",
+            "title": "Apollo 11 Video",
+            "creator": ["NASA", "Someone Else"],
+            "date": "1969-07-20T00:00:00Z",
+            "mediatype": "movies",
+            "item_size": 1234567,
+            "downloads": 42,
+        }
+        result = parse_doc(doc)
+        self.assertEqual(result.identifier, "apollo11-video")
+        self.assertEqual(result.title, "Apollo 11 Video")
+        self.assertEqual(result.creator, "NASA, Someone Else")
+        self.assertEqual(result.date, "1969-07-20")
+        self.assertEqual(result.item_size, 1234567)
+        self.assertFalse(result.is_collection)
+
+    def test_sparse_doc_falls_back_to_identifier(self):
+        result = parse_doc({"identifier": "mystery-item"})
+        self.assertEqual(result.title, "mystery-item")
+        self.assertEqual(result.creator, "")
+        self.assertEqual(result.item_size, 0)
+
+    def test_collection_flag(self):
+        result = parse_doc({"identifier": "nasa", "mediatype": "collection"})
+        self.assertTrue(result.is_collection)
+
+
+class TestSearchPage(unittest.TestCase):
+    def test_has_more(self):
+        self.assertTrue(SearchPage(total=120, page=1, rows=50).has_more)
+        self.assertTrue(SearchPage(total=120, page=2, rows=50).has_more)
+        self.assertFalse(SearchPage(total=120, page=3, rows=50).has_more)
+        self.assertFalse(SearchPage(total=0, page=1, rows=50).has_more)
+
+
+if __name__ == "__main__":
+    unittest.main()

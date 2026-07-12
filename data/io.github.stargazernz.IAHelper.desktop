@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=IA Helper
+Comment=Search and download from the Internet Archive
+Exec=ia-helper
+Icon=io.github.stargazernz.IAHelper
+Terminal=false
+Type=Application
+Categories=Network;FileTransfer;GTK;
+Keywords=internet archive;archive.org;download;search;

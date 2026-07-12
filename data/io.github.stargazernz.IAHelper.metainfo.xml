@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.stargazernz.IAHelper</id>
+  <name>IA Helper</name>
+  <summary>Search and download from the Internet Archive</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <!-- TODO: pick the project license before publishing -->
+  <project_license>GPL-3.0-or-later</project_license>
+  <description>
+    <p>
+      IA Helper simplifies searching for and downloading items and collections
+      from the Internet Archive (archive.org). It operates within the Internet
+      Archive's usage guidelines: it identifies itself, limits concurrent
+      connections, and caches metadata and thumbnails locally.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.stargazernz.IAHelper.desktop</launchable>
+  <url type="homepage">https://github.com/stargazerNZ/ia_helper</url>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-07-12">
+      <description>
+        <p>Milestone 1: search with mediatype filter, thumbnails, paging.</p>
+      </description>
+    </release>
+  </releases>
+</component>

@@ -1,0 +1,10 @@
+.claude/settings.local.json
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.venv/
+.flatpak-builder/
+flatpak-build/
+repo/
