@@ -26,7 +26,7 @@ def default_cache_dir() -> Path:
 
 
 class ThumbnailLoader:
-    def __init__(self, session, cache_dir: Path | None = None, max_workers: int = 3):
+    def __init__(self, session, cache_dir: Path | None = None, max_workers: int = 2):
         self.session = session
         self.cache_dir = cache_dir or default_cache_dir()
         self.cache_dir.mkdir(parents=True, exist_ok=True)

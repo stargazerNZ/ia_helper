@@ -13,8 +13,9 @@ from .. import PROJECT_URL, __version__
 
 USER_AGENT = f"IAHelper/{__version__} (+{PROJECT_URL})"
 
-# Total concurrent connections the app should hold to archive.org.
-# Search uses one; the thumbnail loader takes the rest.
+# Rough budget of concurrent connections to archive.org: one search or
+# metadata request, two thumbnail fetches, and up to
+# config.max_concurrent_downloads (default 3, hard cap 5) downloads.
 MAX_CONNECTIONS = 4
 
 

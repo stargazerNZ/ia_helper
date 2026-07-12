@@ -29,13 +29,15 @@ class FileRow(GObject.Object):
 
 
 class ItemView(Adw.NavigationPage):
-    def __init__(self, result: SearchResult, item_client, thumbs, on_error, on_browse_query):
+    def __init__(self, result: SearchResult, item_client, thumbs, on_error,
+                 on_browse_query, on_download):
         super().__init__(title=result.title or result.identifier)
         self._identifier = result.identifier
         self._client = item_client
         self._thumbs = thumbs
         self._on_error = on_error
         self._on_browse_query = on_browse_query
+        self._on_download = on_download
         self._details: ItemDetails | None = None
         self._all_rows: list[FileRow] = []
 
@@ -214,7 +216,8 @@ class ItemView(Adw.NavigationPage):
 
         self._download_button = Gtk.Button(label="Download selected", sensitive=False)
         self._download_button.add_css_class("suggested-action")
-        self._download_button.set_tooltip_text("Downloads arrive in milestone 3")
+        self._download_button.set_tooltip_text("Select files to download")
+        self._download_button.connect("clicked", self._on_download_clicked)
         footer.append(self._download_button)
         section.append(footer)
 
@@ -375,3 +378,9 @@ class ItemView(Adw.NavigationPage):
             self._selection_label.set_label(
                 f"{len(chosen)} file{'s' if len(chosen) != 1 else ''} selected · {format_size(total)}"
             )
+        self._download_button.set_sensitive(bool(chosen) and self._details is not None)
+
+    def _on_download_clicked(self, _button):
+        entries = [r.entry for r in self._all_rows if r.selected]
+        if entries and self._details is not None:
+            self._on_download(self._details, entries)

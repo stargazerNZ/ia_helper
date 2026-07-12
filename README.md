@@ -7,16 +7,15 @@ operating within the Archive's
 it identifies itself with a descriptive User-Agent, limits concurrent
 connections, and caches thumbnails and metadata locally.
 
-**Status: Milestone 2** — item view with metadata, file selection, and
-grouping memberships.
+**Status: Milestone 3** — working download manager.
 
 ## Roadmap
 
 | Milestone | Scope |
 |---|---|
 | M1 ✓ | Walking skeleton: window, search, results list, thumbnails, paging |
-| **M2 (this)** | Item view: metadata, file list with selection, "Member of" collections/lists |
-| M3 | Download manager: queue, progress, pause/resume, checksum verification |
+| M2 ✓ | Item view: metadata, file list with selection, "Member of" collections/lists |
+| **M3 (this)** | Download manager: queue, progress, pause/resume, checksum verification |
 | M4 | Packaging: Flatpak (primary), .deb (secondary) |
 | M5 | Polish: error states, keyboard navigation, Flathub submission |
 
@@ -33,11 +32,16 @@ ia_helper/
                    # simple lists, favorites are all just query forms)
     items.py       # Item Metadata API: full record, file list, simplelists
     thumbnails.py  # thumbnail fetch + on-disk cache
+    downloads.py   # download queue: workers, Range resume, MD5 verify,
+                   # persistence (~/.local/state/ia-helper/queue.json)
+    config.py      # settings JSON (~/.config/ia-helper/config.json)
   ui/            # GTK4/libadwaita — libadwaita kept to layout chrome only,
                  # so a future Windows build can swap it out
-    window.py      # NavigationView, shared session/clients, view wiring
+    window.py      # NavigationView + Search/Downloads ViewStack, shared clients
     search_view.py
     item_view.py   # metadata, "Member of" chips, file list with selection
+    downloads_view.py
+    settings.py    # preferences dialog (download dir, concurrency)
     format.py
     worker.py      # thread → GLib.idle_add bridge
   main.py        # Adw.Application entry point
@@ -49,6 +53,15 @@ IA groupings the app understands (all resolve to search queries):
 - **Simple lists** — `simplelists__<list>:<parent>`; an item's memberships
   come from `GET /metadata/<id>/simplelists`.
 - **Favorites** — the pseudo-collection `collection:fav-<username>`.
+
+## Downloads
+
+Files download to `<download dir>/<identifier>/<file>` (default: your XDG
+download directory), streaming into a `.part` file that is renamed into place
+only after the size and MD5 checks pass. Interrupted downloads resume with
+HTTP Range requests. The queue survives restarts; tasks that were mid-flight
+re-queue automatically. Concurrency is user-configurable but hard-capped at 5
+out of politeness to archive.org.
 
 ## Running (development, Linux)
 
