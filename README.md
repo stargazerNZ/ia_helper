@@ -53,6 +53,8 @@ IA groupings the app understands (all resolve to search queries):
 - **Simple lists** — `simplelists__<list>:<parent>`; an item's memberships
   come from `GET /metadata/<id>/simplelists`.
 - **Favorites** — the pseudo-collection `collection:fav-<username>`.
+- **Uploader** — `uploader:"<email>"`; shown as a clickable "Uploaded by"
+  link on the item page (absent on many institutional/scanned items).
 
 ## Downloads
 

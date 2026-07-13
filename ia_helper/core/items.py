@@ -96,6 +96,9 @@ class ItemDetails:
     mediatype: str = ""
     collections: list[str] = field(default_factory=list)
     subjects: list[str] = field(default_factory=list)
+    # The uploading account (an email address; absent on many
+    # institutional/scanned items). Queryable via uploader:"…".
+    uploader: str = ""
     files: list[FileEntry] = field(default_factory=list)
     item_size: int = 0
     files_count: int = 0
@@ -141,6 +144,7 @@ def parse_item(payload: dict) -> ItemDetails:
         mediatype=_as_text(metadata.get("mediatype")),
         collections=_as_list(metadata.get("collection")),
         subjects=subjects,
+        uploader=_as_text(metadata.get("uploader")),
         files=[parse_file(f) for f in payload.get("files") or []],
         item_size=int(payload.get("item_size") or 0),
         files_count=int(payload.get("files_count") or 0),

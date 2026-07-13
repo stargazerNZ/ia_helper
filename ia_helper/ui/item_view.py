@@ -124,6 +124,12 @@ class ItemView(Adw.NavigationPage):
         text_box.append(self._byline_label)
         text_box.append(self._detail_label)
 
+        self._uploader_button = Gtk.Button(halign=Gtk.Align.START, visible=False)
+        self._uploader_button.add_css_class("flat")
+        self._uploader_button.set_tooltip_text("Show all items from this uploader")
+        self._uploader_button.connect("clicked", self._on_uploader_clicked)
+        text_box.append(self._uploader_button)
+
         self._browse_collection_button = Gtk.Button(
             label="Browse this collection",
             halign=Gtk.Align.START,
@@ -337,6 +343,10 @@ class ItemView(Adw.NavigationPage):
         detail_bits.append(f"{details.files_count or len(details.files)} files")
         self._detail_label.set_label(" · ".join(b for b in detail_bits if b))
 
+        if details.uploader:
+            self._uploader_button.set_label(f"Uploaded by {details.uploader}")
+            self._uploader_button.set_visible(True)
+
         if details.description:
             self._description_label.set_label(details.description)
             self._description_label.set_visible(True)
@@ -365,6 +375,10 @@ class ItemView(Adw.NavigationPage):
             self._on_simplelists_loaded,
             lambda exc: None,  # memberships are optional decoration
         )
+
+    def _on_uploader_clicked(self, _button):
+        if self._details is not None and self._details.uploader:
+            self._on_browse_query(f'uploader:"{self._details.uploader}"')
 
     def _on_failed(self, exc):
         self._error_page.set_title("Couldn't load item")

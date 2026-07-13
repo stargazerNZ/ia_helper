@@ -95,6 +95,14 @@ class TestParseItem(unittest.TestCase):
         payload = {"metadata": {"identifier": "dark-item"}, "is_dark": True}
         self.assertTrue(parse_item(payload).is_dark)
 
+    def test_uploader(self):
+        payload = {
+            "metadata": {"identifier": "x", "uploader": "someone@example.com"}
+        }
+        self.assertEqual(parse_item(payload).uploader, "someone@example.com")
+        # Absent on institutional/scanned items.
+        self.assertEqual(parse_item({"metadata": {"identifier": "x"}}).uploader, "")
+
     def test_access_restricted_item(self):
         # Flag arrives as the string "true" in item metadata (observed live
         # on lending-library books, e.g. collection:inlibrary).
