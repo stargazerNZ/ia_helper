@@ -89,6 +89,9 @@ box:
   re-downloaded; duplicate active queue entries must be refused.
 - **R5.7** Download progress must show per-task progress, speed, and state,
   with an "open containing folder" action for completed files.
+- **R5.8** The downloads view must group tasks by item (title, aggregate
+  file count/size/progress) with group-level pause/resume/cancel and an
+  "open item folder" action; per-file controls remain inside each group.
 
 ## 6. Internet Archive citizenship
 

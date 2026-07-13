@@ -25,6 +25,12 @@
        at stable URLs (the repo must be public for raw.githubusercontent
        links to work). -->
   <releases>
+    <release version="0.7.0" date="2026-07-13">
+      <description>
+        <p>Downloads are now grouped by item, with aggregate progress and
+        per-item pause/resume/cancel and open-folder actions.</p>
+      </description>
+    </release>
     <release version="0.6.1" date="2026-07-13">
       <description>
         <p>Fix item-page thumbnails that never appeared: corrupt cache

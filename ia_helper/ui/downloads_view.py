@@ -1,12 +1,22 @@
-"""Downloads view: live queue with per-task progress and controls.
+"""Downloads view: the queue grouped by item.
 
-DownloadManager listeners fire on worker threads; every event is
-trampolined onto the GTK main loop before touching widgets.
+One Adw.ExpanderRow per item with aggregate progress and group actions
+(pause/resume/cancel all, open folder); one row per file inside. Grouping
+is purely presentational — the DownloadManager's queue stays flat.
+
+Rows are permanent per task (a ListBox, not a recycled ListView — download
+queues are tens of rows, not thousands), which keeps updates simple:
+manager events are trampolined onto the main loop and patch widgets
+directly. Queues are rebuilt wholesale only on "Clear finished".
 """
 
-from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango
+from gi.repository import Adw, Gio, GLib, Gtk
 
-from ..core.downloads import DownloadState, DownloadTask
+from ..core.downloads import (
+    FINISHED_STATES,
+    DownloadState,
+    DownloadTask,
+)
 from .format import format_size
 
 STATE_LABELS = {
@@ -18,18 +28,8 @@ STATE_LABELS = {
     DownloadState.CANCELLED: "Cancelled",
 }
 
-
-class TaskItem(GObject.Object):
-    """Wraps a DownloadTask; ``rev`` bumps to trigger bound-row refreshes."""
-
-    rev = GObject.Property(type=int, default=0)
-
-    def __init__(self, task: DownloadTask):
-        super().__init__()
-        self.task = task
-
-    def bump(self):
-        self.rev += 1
+ACTIVE_STATES = (DownloadState.RUNNING, DownloadState.QUEUED)
+RESUMABLE_STATES = (DownloadState.PAUSED, DownloadState.FAILED)
 
 
 class DownloadsView(Gtk.Box):
@@ -37,7 +37,10 @@ class DownloadsView(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self._manager = manager
         self._on_error = on_error
-        self._items: dict[str, TaskItem] = {}
+        # identifier -> {"row", "tasks": {task.id: task}, buttons...}
+        self._groups: dict[str, dict] = {}
+        # task.id -> {"task", "row", "progress", "toggle", "cancel", "folder"}
+        self._file_rows: dict[str, dict] = {}
 
         toolbar = Gtk.Box(
             orientation=Gtk.Orientation.HORIZONTAL,
@@ -56,19 +59,19 @@ class DownloadsView(Gtk.Box):
         toolbar.append(clear_button)
         self.append(toolbar)
 
-        self._store = Gio.ListStore(item_type=TaskItem)
-        factory = Gtk.SignalListItemFactory()
-        factory.connect("setup", self._on_row_setup)
-        factory.connect("bind", self._on_row_bind)
-        factory.connect("unbind", self._on_row_unbind)
-
-        list_view = Gtk.ListView(
-            model=Gtk.NoSelection(model=self._store),
-            factory=factory,
+        self._list_box = Gtk.ListBox(
+            selection_mode=Gtk.SelectionMode.NONE,
+            valign=Gtk.Align.START,
+            margin_top=6,
+            margin_bottom=12,
+            margin_start=12,
+            margin_end=12,
         )
+        self._list_box.add_css_class("boxed-list")
 
+        clamp = Adw.Clamp(maximum_size=900, child=self._list_box)
         scroller = Gtk.ScrolledWindow(vexpand=True)
-        scroller.set_child(list_view)
+        scroller.set_child(clamp)
 
         self._empty_page = Adw.StatusPage(
             title="No downloads",
@@ -83,8 +86,8 @@ class DownloadsView(Gtk.Box):
         self.append(self._stack)
 
         for task in manager.tasks():
-            self._ensure_item(task)
-        self._refresh_chrome()
+            self._attach_task(task)
+        self._refresh_everything()
 
         manager.add_listener(self._on_task_event_threaded)
 
@@ -94,25 +97,192 @@ class DownloadsView(Gtk.Box):
         GLib.idle_add(self._on_task_event, task)
 
     def _on_task_event(self, task: DownloadTask):
-        self._ensure_item(task).bump()
+        if task.id not in self._file_rows:
+            self._attach_task(task)
+        self._update_file_row(self._file_rows[task.id])
+        self._update_group(task.identifier)
         self._refresh_chrome()
 
-    def _ensure_item(self, task: DownloadTask) -> TaskItem:
-        item = self._items.get(task.id)
-        if item is None:
-            item = TaskItem(task)
-            self._items[task.id] = item
-            self._store.append(item)
-        return item
+    # -- construction ----------------------------------------------------------
+
+    def _attach_task(self, task: DownloadTask):
+        group = self._groups.get(task.identifier)
+        if group is None:
+            group = self._create_group(task)
+        record = self._create_file_row(task)
+        group["tasks"][task.id] = task
+        group["row"].add_row(record["row"])
+
+    def _create_group(self, task: DownloadTask) -> dict:
+        row = Adw.ExpanderRow(title=task.item_title or task.identifier)
+        row.set_tooltip_text(task.identifier)
+
+        pause = Gtk.Button(
+            icon_name="media-playback-pause-symbolic",
+            tooltip_text="Pause all",
+            valign=Gtk.Align.CENTER,
+        )
+        pause.add_css_class("flat")
+        resume = Gtk.Button(
+            icon_name="media-playback-start-symbolic",
+            tooltip_text="Resume all",
+            valign=Gtk.Align.CENTER,
+        )
+        resume.add_css_class("flat")
+        cancel = Gtk.Button(
+            icon_name="process-stop-symbolic",
+            tooltip_text="Cancel all",
+            valign=Gtk.Align.CENTER,
+        )
+        cancel.add_css_class("flat")
+        folder = Gtk.Button(
+            icon_name="folder-open-symbolic",
+            tooltip_text="Open item folder",
+            valign=Gtk.Align.CENTER,
+        )
+        folder.add_css_class("flat")
+
+        identifier = task.identifier
+        pause.connect("clicked", lambda *_: self._group_action(identifier, "pause"))
+        resume.connect("clicked", lambda *_: self._group_action(identifier, "resume"))
+        cancel.connect("clicked", lambda *_: self._group_action(identifier, "cancel"))
+        folder.connect("clicked", lambda *_: self._open_folder(identifier))
+
+        for button in (pause, resume, cancel, folder):
+            row.add_suffix(button)
+
+        group = {
+            "row": row,
+            "tasks": {},
+            "pause": pause,
+            "resume": resume,
+            "cancel": cancel,
+            "folder": folder,
+        }
+        self._groups[identifier] = group
+        self._list_box.append(row)
+        return group
+
+    def _create_file_row(self, task: DownloadTask) -> dict:
+        row = Adw.ActionRow(title=task.file_name)
+        row.set_title_lines(1)
+        row.set_subtitle_lines(1)
+
+        progress = Gtk.ProgressBar(valign=Gtk.Align.CENTER)
+        progress.set_size_request(110, -1)
+        row.add_suffix(progress)
+
+        toggle = Gtk.Button(valign=Gtk.Align.CENTER)
+        toggle.add_css_class("flat")
+        toggle.connect("clicked", lambda *_: self._toggle_task(task))
+        row.add_suffix(toggle)
+
+        cancel = Gtk.Button(
+            icon_name="process-stop-symbolic",
+            tooltip_text="Cancel",
+            valign=Gtk.Align.CENTER,
+        )
+        cancel.add_css_class("flat")
+        cancel.connect("clicked", lambda *_: self._manager.cancel(task))
+        row.add_suffix(cancel)
+
+        folder = Gtk.Button(
+            icon_name="folder-open-symbolic",
+            tooltip_text="Open containing folder",
+            valign=Gtk.Align.CENTER,
+        )
+        folder.add_css_class("flat")
+        folder.connect("clicked", lambda *_: self._open_file_folder(task))
+        row.add_suffix(folder)
+
+        record = {
+            "task": task,
+            "row": row,
+            "progress": progress,
+            "toggle": toggle,
+            "cancel": cancel,
+            "folder": folder,
+        }
+        self._file_rows[task.id] = record
+        self._update_file_row(record)
+        return record
+
+    # -- updates -------------------------------------------------------------
+
+    def _update_file_row(self, record: dict):
+        task: DownloadTask = record["task"]
+
+        bits = [STATE_LABELS[task.state]]
+        if task.state == DownloadState.FAILED and task.error:
+            bits = [f"Failed — {task.error}"]
+        if task.size:
+            bits.append(f"{format_size(task.downloaded)} of {format_size(task.size)}")
+        elif task.downloaded:
+            bits.append(format_size(task.downloaded))
+        if task.state == DownloadState.RUNNING and task.speed_bps > 0:
+            bits.append(f"{format_size(int(task.speed_bps))}/s")
+        record["row"].set_subtitle(" · ".join(bits))
+
+        record["progress"].set_fraction(
+            1.0 if task.state == DownloadState.COMPLETED else task.progress
+        )
+        record["progress"].set_visible(task.state != DownloadState.CANCELLED)
+
+        toggle = record["toggle"]
+        if task.state in ACTIVE_STATES:
+            toggle.set_icon_name("media-playback-pause-symbolic")
+            toggle.set_tooltip_text("Pause")
+            toggle.set_visible(True)
+        elif task.state == DownloadState.PAUSED:
+            toggle.set_icon_name("media-playback-start-symbolic")
+            toggle.set_tooltip_text("Resume")
+            toggle.set_visible(True)
+        elif task.state == DownloadState.FAILED:
+            toggle.set_icon_name("view-refresh-symbolic")
+            toggle.set_tooltip_text("Retry")
+            toggle.set_visible(True)
+        else:
+            toggle.set_visible(False)
+
+        record["cancel"].set_visible(task.state not in FINISHED_STATES)
+        record["folder"].set_visible(task.state == DownloadState.COMPLETED)
+
+    def _update_group(self, identifier: str):
+        group = self._groups.get(identifier)
+        if group is None:
+            return
+        tasks = list(group["tasks"].values())
+
+        done = sum(1 for t in tasks if t.state == DownloadState.COMPLETED)
+        failed = sum(1 for t in tasks if t.state == DownloadState.FAILED)
+        active = sum(1 for t in tasks if t.state in ACTIVE_STATES)
+        paused = sum(1 for t in tasks if t.state == DownloadState.PAUSED)
+
+        bits = [f"{done} of {len(tasks)} files"]
+        total_size = sum(t.size for t in tasks)
+        if total_size:
+            downloaded = sum(
+                t.size if t.state == DownloadState.COMPLETED else t.downloaded
+                for t in tasks
+            )
+            bits.append(f"{format_size(downloaded)} of {format_size(total_size)}")
+        if active:
+            bits.append("downloading")
+        elif paused:
+            bits.append("paused")
+        if failed:
+            bits.append(f"{failed} failed")
+        group["row"].set_subtitle(" · ".join(bits))
+
+        group["pause"].set_visible(active > 0)
+        group["resume"].set_visible(paused + failed > 0)
+        group["cancel"].set_visible(any(t.state not in FINISHED_STATES for t in tasks))
+        group["folder"].set_visible(done > 0)
 
     def _refresh_chrome(self):
-        count = self._store.get_n_items()
-        self._stack.set_visible_child_name("list" if count else "empty")
-        tasks = [self._store.get_item(i).task for i in range(count)]
-        active = sum(
-            1 for t in tasks
-            if t.state in (DownloadState.RUNNING, DownloadState.QUEUED)
-        )
+        tasks = self._manager.tasks()
+        self._stack.set_visible_child_name("list" if tasks else "empty")
+        active = sum(1 for t in tasks if t.state in ACTIVE_STATES)
         done = sum(1 for t in tasks if t.state == DownloadState.COMPLETED)
         failed = sum(1 for t in tasks if t.state == DownloadState.FAILED)
         bits = []
@@ -124,142 +294,46 @@ class DownloadsView(Gtk.Box):
             bits.append(f"{failed} failed")
         self._summary_label.set_label(" · ".join(bits))
 
-    def _clear_finished(self):
-        self._manager.clear_finished()
-        keep = {t.id for t in self._manager.tasks()}
-        self._items = {tid: item for tid, item in self._items.items() if tid in keep}
-        self._store.remove_all()
-        for task in self._manager.tasks():
-            self._items[task.id] = self._items.get(task.id) or TaskItem(task)
-            self._store.append(self._items[task.id])
+    def _refresh_everything(self):
+        for identifier in self._groups:
+            self._update_group(identifier)
         self._refresh_chrome()
 
-    # -- rows ----------------------------------------------------------------
+    # -- actions --------------------------------------------------------------
 
-    def _on_row_setup(self, _factory, list_item):
-        box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL,
-            spacing=4,
-            margin_top=8,
-            margin_bottom=8,
-            margin_start=12,
-            margin_end=12,
-        )
-
-        top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        name = Gtk.Label(xalign=0.0, hexpand=True, ellipsize=Pango.EllipsizeMode.MIDDLE)
-        name.add_css_class("heading")
-        state = Gtk.Label(xalign=1.0)
-        state.add_css_class("dim-label")
-        top.append(name)
-        top.append(state)
-        box.append(top)
-
-        progress = Gtk.ProgressBar()
-        box.append(progress)
-
-        bottom = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        detail = Gtk.Label(xalign=0.0, hexpand=True, ellipsize=Pango.EllipsizeMode.END)
-        detail.add_css_class("caption")
-        detail.add_css_class("dim-label")
-        bottom.append(detail)
-
-        toggle = Gtk.Button()
-        toggle.add_css_class("flat")
-        toggle.connect("clicked", lambda *_: self._toggle(list_item))
-        bottom.append(toggle)
-
-        cancel = Gtk.Button(icon_name="process-stop-symbolic", tooltip_text="Cancel")
-        cancel.add_css_class("flat")
-        cancel.connect("clicked", lambda *_: self._cancel(list_item))
-        bottom.append(cancel)
-
-        folder = Gtk.Button(
-            icon_name="folder-open-symbolic", tooltip_text="Open containing folder"
-        )
-        folder.add_css_class("flat")
-        folder.connect("clicked", lambda *_: self._open_folder(list_item))
-        bottom.append(folder)
-
-        box.append(bottom)
-
-        box.name_label = name
-        box.state_label = state
-        box.progress = progress
-        box.detail_label = detail
-        box.toggle_button = toggle
-        box.cancel_button = cancel
-        box.folder_button = folder
-        list_item.set_child(box)
-
-    def _on_row_bind(self, _factory, list_item):
-        item: TaskItem = list_item.get_item()
-        handler = item.connect(
-            "notify::rev", lambda *_: self._update_row(list_item.get_child(), item.task)
-        )
-        list_item.rev_handler = handler
-        self._update_row(list_item.get_child(), item.task)
-
-    def _on_row_unbind(self, _factory, list_item):
-        handler = getattr(list_item, "rev_handler", None)
-        if handler is not None:
-            list_item.get_item().disconnect(handler)
-            list_item.rev_handler = None
-
-    def _update_row(self, row, task: DownloadTask):
-        row.name_label.set_label(f"{task.identifier} / {task.file_name}")
-
-        state_text = STATE_LABELS[task.state]
-        if task.state == DownloadState.FAILED and task.error:
-            state_text = f"Failed — {task.error}"
-        row.state_label.set_label(state_text)
-
-        row.progress.set_fraction(
-            1.0 if task.state == DownloadState.COMPLETED else task.progress
-        )
-
-        bits = []
-        if task.size:
-            bits.append(f"{format_size(task.downloaded)} of {format_size(task.size)}")
-        elif task.downloaded:
-            bits.append(format_size(task.downloaded))
-        if task.state == DownloadState.RUNNING and task.speed_bps > 0:
-            bits.append(f"{format_size(int(task.speed_bps))}/s")
-        row.detail_label.set_label(" · ".join(bits))
-
-        if task.state in (DownloadState.RUNNING, DownloadState.QUEUED):
-            row.toggle_button.set_icon_name("media-playback-pause-symbolic")
-            row.toggle_button.set_tooltip_text("Pause")
-            row.toggle_button.set_visible(True)
-        elif task.state == DownloadState.PAUSED:
-            row.toggle_button.set_icon_name("media-playback-start-symbolic")
-            row.toggle_button.set_tooltip_text("Resume")
-            row.toggle_button.set_visible(True)
-        elif task.state == DownloadState.FAILED:
-            row.toggle_button.set_icon_name("view-refresh-symbolic")
-            row.toggle_button.set_tooltip_text("Retry")
-            row.toggle_button.set_visible(True)
-        else:
-            row.toggle_button.set_visible(False)
-
-        row.cancel_button.set_visible(
-            task.state not in (DownloadState.COMPLETED, DownloadState.CANCELLED)
-        )
-        row.folder_button.set_visible(task.state == DownloadState.COMPLETED)
-
-    # -- row actions -----------------------------------------------------------
-
-    def _toggle(self, list_item):
-        task = list_item.get_item().task
-        if task.state in (DownloadState.RUNNING, DownloadState.QUEUED):
+    def _toggle_task(self, task: DownloadTask):
+        if task.state in ACTIVE_STATES:
             self._manager.pause(task)
         else:
             self._manager.resume(task)
 
-    def _cancel(self, list_item):
-        self._manager.cancel(list_item.get_item().task)
+    def _group_action(self, identifier: str, action: str):
+        for task in list(self._groups[identifier]["tasks"].values()):
+            if action == "pause" and task.state in ACTIVE_STATES:
+                self._manager.pause(task)
+            elif action == "resume" and task.state in RESUMABLE_STATES:
+                self._manager.resume(task)
+            elif action == "cancel" and task.state not in FINISHED_STATES:
+                self._manager.cancel(task)
 
-    def _open_folder(self, list_item):
-        task = list_item.get_item().task
+    def _clear_finished(self):
+        self._manager.clear_finished()
+        self._list_box.remove_all()
+        self._groups.clear()
+        self._file_rows.clear()
+        for task in self._manager.tasks():
+            self._attach_task(task)
+        self._refresh_everything()
+
+    def _open_folder(self, identifier: str):
+        tasks = self._groups[identifier]["tasks"].values()
+        first = next(iter(tasks), None)
+        if first is not None:
+            launcher = Gtk.FileLauncher(
+                file=Gio.File.new_for_path(str(first.item_dir))
+            )
+            launcher.launch(self.get_root(), None, None)
+
+    def _open_file_folder(self, task: DownloadTask):
         launcher = Gtk.FileLauncher(file=Gio.File.new_for_path(str(task.dest)))
         launcher.open_containing_folder(self.get_root(), None, None)

@@ -41,8 +41,9 @@ ia_helper/
     item_view.py           item page: metadata header, restriction banner,
                            "Member of" chips, uploader link, file ColumnView
                            with selection rules
-    downloads_view.py      live queue list; trampolines manager events onto
-                           the main loop
+    downloads_view.py      queue grouped by item (ExpanderRow per item,
+                           aggregate progress, group + per-file controls);
+                           trampolines manager events onto the main loop
     settings.py            Adw.PreferencesDialog: download dir, concurrency
     format.py              size formatting
     worker.py              run_in_thread(): worker thread → GLib.idle_add

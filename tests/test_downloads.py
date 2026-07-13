@@ -178,6 +178,22 @@ class TestQueueBehaviour(unittest.TestCase):
         expected = self.tmp / "downloads" / "item1" / "disc1" / "track01.flac"
         self.assertEqual(task.dest, expected)
 
+    def test_item_title_stored_and_persisted(self):
+        manager = make_manager(self.tmp)
+        (task,) = manager.enqueue("item1", [entry()], item_title="A Nice Film")
+        self.assertEqual(task.item_title, "A Nice Film")
+        reloaded = make_manager(self.tmp)
+        self.assertEqual(reloaded.tasks()[0].item_title, "A Nice Film")
+
+    def test_item_dir_flat_and_nested(self):
+        manager = make_manager(self.tmp)
+        flat, nested = manager.enqueue(
+            "item1", [entry(name="a.mpg"), entry(name="disc1/sub/b.flac")]
+        )
+        expected = self.tmp / "downloads" / "item1"
+        self.assertEqual(flat.item_dir, expected)
+        self.assertEqual(nested.item_dir, expected)
+
     def test_persistence_round_trip_requeues_running(self):
         manager = make_manager(self.tmp)
         task_a, task_b = manager.enqueue(

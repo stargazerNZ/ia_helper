@@ -10,6 +10,7 @@
 | M4 | Packaging: Flatpak with pinned offline dependencies; Debian packaging (Ubuntu 26.04+) |
 | M5 | Polish: app menu, About/version, keyboard shortcuts, search error/retry states, 429/5xx backoff, chip styling |
 | M6 | IA account login (S3 keys via `ia configure`, My favorites / My uploads, entitled downloads) and search sorting |
+| M7 | Grouped downloads view: expander per item with aggregate progress and group pause/resume/cancel/open-folder |
 
 Post-MVP additions along the way: access-restriction handling
 (lending-library items, private files), DRM labelling with Select-all
@@ -34,11 +35,6 @@ Non-code items, in rough order:
 ## Future development candidates
 
 Ordered roughly by value-for-effort; none are commitments.
-
-### Grouped downloads view
-The queue is a flat per-file list; downloading 40 files from one item
-shows 40 rows. Group rows by item with an expander and per-item aggregate
-progress/actions.
 
 ### Query-based bulk downloads ("sets of items")
 The deliberately parked MVP feature: "download everything matching this

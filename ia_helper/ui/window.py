@@ -173,7 +173,9 @@ class MainWindow(Adw.ApplicationWindow):
     # -- downloads -----------------------------------------------------------
 
     def enqueue_download(self, details: ItemDetails, entries) -> None:
-        created = self._manager.enqueue(details.identifier, entries)
+        created = self._manager.enqueue(
+            details.identifier, entries, item_title=details.title
+        )
         toast = Adw.Toast(
             title=f"Queued {len(created)} file{'s' if len(created) != 1 else ''}"
         )

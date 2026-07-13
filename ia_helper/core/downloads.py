@@ -59,6 +59,9 @@ class DownloadTask:
     dest: Path
     size: int = 0
     md5: str = ""
+    # Human-readable item title, for grouping in the UI. Optional —
+    # tasks persisted before it existed fall back to the identifier.
+    item_title: str = ""
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
     state: DownloadState = DownloadState.QUEUED
     downloaded: int = 0
@@ -72,6 +75,13 @@ class DownloadTask:
     @property
     def part_path(self) -> Path:
         return self.dest.with_name(self.dest.name + ".part")
+
+    @property
+    def item_dir(self) -> Path:
+        """The per-item download directory (file names may contain
+        subdirectories, so this walks up the right number of levels)."""
+        depth = len(PurePosixPath(self.file_name).parts)
+        return self.dest.parents[depth - 1]
 
     @property
     def progress(self) -> float:
@@ -94,6 +104,7 @@ class DownloadTask:
             "dest": str(self.dest),
             "size": self.size,
             "md5": self.md5,
+            "item_title": self.item_title,
             "state": self.state.value,
             "error": self.error,
         }
@@ -106,6 +117,7 @@ class DownloadTask:
             dest=Path(raw["dest"]),
             size=int(raw.get("size") or 0),
             md5=raw.get("md5", ""),
+            item_title=raw.get("item_title", ""),
             id=raw.get("id") or uuid.uuid4().hex,
         )
         state = DownloadState(raw.get("state", "queued"))
@@ -146,7 +158,8 @@ class DownloadManager:
         with self._lock:
             return list(self._tasks)
 
-    def enqueue(self, identifier: str, entries: list[FileEntry]) -> list[DownloadTask]:
+    def enqueue(self, identifier: str, entries: list[FileEntry],
+                item_title: str = "") -> list[DownloadTask]:
         created = []
         with self._lock:
             active_dests = {
@@ -171,6 +184,7 @@ class DownloadManager:
                     dest=dest,
                     size=entry.size,
                     md5=entry.md5,
+                    item_title=item_title,
                 )
                 if dest.exists() and (task.size == 0 or dest.stat().st_size == task.size):
                     task.state = DownloadState.COMPLETED
