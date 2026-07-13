@@ -33,6 +33,17 @@ RESULT_FIELDS = [
     "access-restricted-item",
 ]
 
+# (label, sort[] value) pairs for the UI sort dropdown. None = relevance.
+# Values verified against live advancedsearch (invalid fields error).
+SORTS = [
+    ("Relevance", None),
+    ("Most downloaded", "downloads desc"),
+    ("Date (newest)", "date desc"),
+    ("Date (oldest)", "date asc"),
+    ("Recently added", "publicdate desc"),
+    ("Title (A–Z)", "titleSorter asc"),
+]
+
 # (label, mediatype value) pairs for the UI filter. None = no filter.
 MEDIATYPES = [
     ("All types", None),
@@ -138,7 +149,8 @@ class SearchClient:
         self.session = session
         self.rows = rows
 
-    def search(self, query: SearchQuery, page: int = 1) -> SearchPage:
+    def search(self, query: SearchQuery, page: int = 1,
+               sort: str | None = None) -> SearchPage:
         params = {
             "q": query.to_lucene(),
             "fl[]": RESULT_FIELDS,
@@ -146,6 +158,8 @@ class SearchClient:
             "page": page,
             "output": "json",
         }
+        if sort:
+            params["sort[]"] = sort
         response = self.session.get(ADVANCED_SEARCH_URL, params=params, timeout=30)
         response.raise_for_status()
         payload = response.json().get("response", {})

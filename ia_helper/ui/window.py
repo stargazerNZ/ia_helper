@@ -1,6 +1,7 @@
 from gi.repository import Adw, Gio, Gtk
 
 from .. import APP_ID, APP_NAME, PROJECT_URL, __version__
+from ..core import account
 from ..core.api import create_session
 from ..core.config import load_config
 from ..core.downloads import DownloadManager
@@ -11,6 +12,7 @@ from .downloads_view import DownloadsView
 from .item_view import ItemView
 from .search_view import SearchView
 from .settings import PreferencesDialog
+from .worker import run_in_thread
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -23,13 +25,14 @@ class MainWindow(Adw.ApplicationWindow):
         )
 
         # One session for the whole app: connection pooling, User-Agent and
-        # (later) credentials are configured once in core.api.
-        session = create_session()
+        # stored account credentials are configured once in core.api.
+        self._session = create_session()
         self._config = load_config()
-        self._search_client = SearchClient(session)
-        self._item_client = ItemClient(session)
-        self._thumbs = ThumbnailLoader(session)
-        self._manager = DownloadManager(session, self._config)
+        self._account: account.AccountInfo | None = None
+        self._search_client = SearchClient(self._session)
+        self._item_client = ItemClient(self._session)
+        self._thumbs = ThumbnailLoader(self._session)
+        self._manager = DownloadManager(self._session, self._config)
 
         self._navigation = Adw.NavigationView()
 
@@ -59,8 +62,14 @@ class MainWindow(Adw.ApplicationWindow):
             )
         )
         menu = Gio.Menu()
-        menu.append("Preferences", "win.preferences")
-        menu.append(f"About {APP_NAME}", "win.about")
+        account_section = Gio.Menu()
+        account_section.append("My favorites", "win.my-favorites")
+        account_section.append("My uploads", "win.my-uploads")
+        menu.append_section(None, account_section)
+        app_section = Gio.Menu()
+        app_section.append("Preferences", "win.preferences")
+        app_section.append(f"About {APP_NAME}", "win.about")
+        menu.append_section(None, app_section)
         header.pack_end(
             Gtk.MenuButton(
                 icon_name="open-menu-symbolic",
@@ -84,6 +93,14 @@ class MainWindow(Adw.ApplicationWindow):
         self._install_actions()
         self._search_view.grab_search_focus()
 
+        # Resolve stored credentials (if any) to an account; no network
+        # happens when no keys are configured.
+        run_in_thread(
+            lambda: account.fetch_user_info(self._session),
+            self._set_account,
+            lambda exc: None,  # offline at startup: stay signed out
+        )
+
     def _install_actions(self):
         actions = [
             ("preferences", lambda *_: self._on_settings_clicked(None)),
@@ -96,6 +113,16 @@ class MainWindow(Adw.ApplicationWindow):
             action = Gio.SimpleAction.new(name, None)
             action.connect("activate", handler)
             self.add_action(action)
+
+        self._favorites_action = Gio.SimpleAction.new("my-favorites", None)
+        self._favorites_action.connect("activate", self._on_my_favorites)
+        self._favorites_action.set_enabled(False)
+        self.add_action(self._favorites_action)
+
+        self._uploads_action = Gio.SimpleAction.new("my-uploads", None)
+        self._uploads_action.connect("activate", self._on_my_uploads)
+        self._uploads_action.set_enabled(False)
+        self.add_action(self._uploads_action)
 
     # -- navigation -------------------------------------------------------
 
@@ -154,9 +181,63 @@ class MainWindow(Adw.ApplicationWindow):
         toast.connect("button-clicked", lambda *_: self.show_downloads())
         self._toast_overlay.add_toast(toast)
 
+    # -- account ------------------------------------------------------------
+
+    def _set_account(self, info) -> None:
+        self._account = info
+        self._favorites_action.set_enabled(
+            info is not None and bool(info.favorites_query)
+        )
+        self._uploads_action.set_enabled(info is not None)
+
+    def _adopt_session(self, session) -> None:
+        """Swap the shared session (after sign-in/out) on every holder."""
+        self._session = session
+        self._search_client.session = session
+        self._item_client.session = session
+        self._thumbs.session = session
+        self._manager.session = session
+
+    def sign_in(self, email: str, password: str, on_done) -> None:
+        """Async sign-in for the preferences dialog: exchanges the password
+        for stored keys, adopts an authenticated session, resolves the
+        account. on_done(info, exc) runs on the main loop."""
+
+        def work():
+            account.login(email, password)
+            session = create_session()  # re-read config, now with keys
+            return session, account.fetch_user_info(session)
+
+        def ok(result):
+            session, info = result
+            self._adopt_session(session)
+            self._set_account(info)
+            if info is not None:
+                self.show_error(f"Signed in as {info.display_name}")
+            on_done(info, None)
+
+        run_in_thread(work, ok, lambda exc: on_done(None, exc))
+
+    def sign_out(self) -> None:
+        account.logout()
+        self._adopt_session(create_session())
+        self._set_account(None)
+
+    def _on_my_favorites(self, *_args):
+        if self._account is not None and self._account.favorites_query:
+            self.browse_query(self._account.favorites_query)
+
+    def _on_my_uploads(self, *_args):
+        if self._account is not None:
+            self.browse_query(self._account.uploads_query)
+
     def _on_settings_clicked(self, _button):
         dialog = PreferencesDialog(
-            self._config, on_concurrency_changed=self._manager.set_max_concurrent
+            self._config,
+            on_concurrency_changed=self._manager.set_max_concurrent,
+            account=self._account,
+            on_sign_in=self.sign_in,
+            on_sign_out=self.sign_out,
         )
         dialog.present(self)
 

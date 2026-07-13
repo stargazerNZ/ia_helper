@@ -2,7 +2,7 @@
 
 from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, Pango
 
-from ..core.search import MEDIATYPES, SearchQuery, SearchResult
+from ..core.search import MEDIATYPES, SORTS, SearchQuery, SearchResult
 from .format import format_size
 from .worker import run_in_thread
 
@@ -57,6 +57,14 @@ class SearchView(Gtk.Box):
         )
         self._mediatype_dropdown.set_tooltip_text("Media type")
         controls.append(self._mediatype_dropdown)
+
+        self._sort_dropdown = Gtk.DropDown.new_from_strings(
+            [label for label, _ in SORTS]
+        )
+        self._sort_dropdown.set_tooltip_text("Sort order")
+        # Changing sort re-runs the active search; harmless no-op otherwise.
+        self._sort_dropdown.connect("notify::selected", self._on_sort_changed)
+        controls.append(self._sort_dropdown)
 
         search_button = Gtk.Button(label="Search")
         search_button.add_css_class("suggested-action")
@@ -255,6 +263,13 @@ class SearchView(Gtk.Box):
     def _selected_mediatype(self):
         return MEDIATYPES[self._mediatype_dropdown.get_selected()][1]
 
+    def _selected_sort(self):
+        return SORTS[self._sort_dropdown.get_selected()][1]
+
+    def _on_sort_changed(self, *_args):
+        if self._current_query is not None:
+            self._start_search()
+
     def _start_search(self):
         text = self._entry.get_text().strip()
         mediatype = self._selected_mediatype()
@@ -283,8 +298,9 @@ class SearchView(Gtk.Box):
         self._spinner.start()
         self._load_more_button.set_sensitive(False)
 
+        sort = self._selected_sort()
         run_in_thread(
-            lambda: self._client.search(query, page=page_number),
+            lambda: self._client.search(query, page=page_number, sort=sort),
             lambda page: self._on_page_loaded(token, page),
             lambda exc: self._on_search_failed(token, exc),
         )

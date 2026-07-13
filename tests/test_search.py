@@ -2,7 +2,35 @@
 
 import unittest
 
-from ia_helper.core.search import SearchPage, SearchQuery, parse_doc
+from ia_helper.core.search import (
+    RESULT_FIELDS,
+    SearchClient,
+    SearchPage,
+    SearchQuery,
+    parse_doc,
+)
+
+
+class FakeResponse:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self._payload
+
+
+class FakeSession:
+    def __init__(self):
+        self.calls = []
+
+    def get(self, url, params=None, timeout=None):
+        self.calls.append({"url": url, "params": params})
+        return FakeResponse(
+            {"response": {"docs": [{"identifier": "x"}], "numFound": 1}}
+        )
 
 
 class TestSearchQuery(unittest.TestCase):
@@ -61,6 +89,27 @@ class TestParseDoc(unittest.TestCase):
         result = parse_doc({"identifier": "x", "access-restricted-item": "true"})
         self.assertTrue(result.access_restricted)
         self.assertFalse(parse_doc({"identifier": "x"}).access_restricted)
+
+
+class TestSearchClient(unittest.TestCase):
+    def test_request_params(self):
+        session = FakeSession()
+        client = SearchClient(session, rows=50)
+        page = client.search(SearchQuery(text="apollo"), page=2)
+        params = session.calls[0]["params"]
+        self.assertEqual(params["q"], "(apollo)")
+        self.assertEqual(params["page"], 2)
+        self.assertEqual(params["rows"], 50)
+        self.assertEqual(params["fl[]"], RESULT_FIELDS)
+        self.assertNotIn("sort[]", params)
+        self.assertEqual(page.total, 1)
+        self.assertEqual(page.results[0].identifier, "x")
+
+    def test_sort_param(self):
+        session = FakeSession()
+        client = SearchClient(session)
+        client.search(SearchQuery(text="apollo"), sort="downloads desc")
+        self.assertEqual(session.calls[0]["params"]["sort[]"], "downloads desc")
 
 
 class TestSearchPage(unittest.TestCase):

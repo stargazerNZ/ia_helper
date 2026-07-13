@@ -28,6 +28,9 @@ ia_helper/
                            generation counter + cancellable futures
     downloads.py           DownloadManager: queue, bounded workers, Range
                            resume, streaming MD5 verify, JSON persistence
+    account.py             sign-in via internetarchive.configure() (S3 keys;
+                           password never stored), check_auth who-am-i,
+                           sign-out (credential sections removed from ia.ini)
     config.py              Config dataclass; JSON load/save under XDG paths
   ui/                      GTK4/libadwaita; no direct archive.org access
     window.py              MainWindow: NavigationView (root ⇄ item pages),
@@ -95,11 +98,15 @@ Grouping chips (collection, simple list, uploader) all route back through
 | `/services/img/<id>` | thumbnails |
 | `/download/<id>/<file>` | file downloads (Range supported) |
 
-The `internetarchive` library provides the session (`get_session()`), which
-keeps the door open for its credential handling (`ia configure`) when
-account login is added. Citizenship policies (User-Agent, backoff on
-429/5xx honoring Retry-After, connection budget) are configured once in
-`core/api.py`, not per feature.
+The `internetarchive` library provides the session (`get_session()`),
+which reads stored account keys from the standard `ia` config file — after
+sign-in/out the window builds a fresh session and hands it to every holder
+(`_adopt_session`), so authentication is app-wide without restarting.
+Who-am-i goes to `s3.us.archive.org?check_auth=1` (the library's own
+mechanism), which maps keys to the email and the `@itemname` that keys the
+`fav-*` favorites pseudo-collection. Citizenship policies (User-Agent,
+backoff on 429/5xx honoring Retry-After, connection budget) are configured
+once in `core/api.py`, not per feature.
 
 ## Persistence
 

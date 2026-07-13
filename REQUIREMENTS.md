@@ -22,6 +22,9 @@ in [ROADMAP.md](ROADMAP.md).
   by hand.
 - **R1.4** Access-restricted items must be labelled directly in search
   results (see R4).
+- **R1.5** Results must be sortable: relevance (default), most downloaded,
+  date (newest/oldest), recently added, title A–Z. Changing sort re-runs
+  the active search.
 
 ## 2. Item view
 
@@ -49,8 +52,9 @@ box:
   from `GET /metadata/<id>/simplelists` and are shown as list chips.
 - **R3.3 Uploader** — `uploader:"<email>"`; a clickable "Uploaded by" link
   on the item page whenever the metadata carries the field.
-- **R3.4 Favorites** — the pseudo-collection `collection:fav-<username>`
-  (no dedicated UI yet; reachable via R1.3).
+- **R3.4 Favorites** — the pseudo-collection `collection:fav-<itemname>`;
+  a "My favorites" menu entry when signed in (see R9), and reachable by
+  hand via R1.3.
 
 ## 4. Access restrictions (terms-of-service compliance)
 
@@ -125,8 +129,23 @@ box:
 - **R8.3** Core logic must be unit-testable without network access or a
   display server.
 
+## 9. Account integration
+
+- **R9.1** The user must be able to sign in with their archive.org email
+  and password from Preferences. The password must be used once — exchanged
+  for S3-style API keys stored in the standard `ia` config file — and never
+  persisted or logged.
+- **R9.2** Signed-in state must be shown in Preferences ("Signed in as …")
+  and must survive restarts (keys re-read at startup; the account resolved
+  without network when no keys exist).
+- **R9.3** Sign-out must remove the stored credentials (the `[s3]` and
+  `[cookies]` config sections) while preserving unrelated `ia` settings.
+- **R9.4** When signed in, "My favorites" and "My uploads" must be one
+  click away (main menu), and all requests carry the account's keys so
+  entitled files download. Signing in must not weaken R4 in any way —
+  restriction handling is unchanged.
+
 ## Out of scope for the MVP
 
-Uploads, metadata editing, reviews, Wayback Machine features, IA account
-login, and query-based bulk downloads ("sets of items") — see
-[ROADMAP.md](ROADMAP.md).
+Uploads, metadata editing, reviews, Wayback Machine features, and
+query-based bulk downloads ("sets of items") — see [ROADMAP.md](ROADMAP.md).

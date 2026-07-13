@@ -25,6 +25,13 @@
        at stable URLs (the repo must be public for raw.githubusercontent
        links to work). -->
   <releases>
+    <release version="0.6.0" date="2026-07-13">
+      <description>
+        <p>Milestone 6: sign in with your archive.org account (My favorites,
+        My uploads, entitled downloads; password exchanged for API keys and
+        never stored) and search sort options.</p>
+      </description>
+    </release>
     <release version="0.5.0" date="2026-07-13">
       <description>
         <p>Milestone 5: polish. App menu with About dialog and keyboard

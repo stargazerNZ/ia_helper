@@ -9,6 +9,7 @@
 | M3 | Download manager: queue, bounded workers, pause/resume/cancel/retry, Range resume, MD5 verification, persistence, preferences |
 | M4 | Packaging: Flatpak with pinned offline dependencies; Debian packaging (Ubuntu 26.04+) |
 | M5 | Polish: app menu, About/version, keyboard shortcuts, search error/retry states, 429/5xx backoff, chip styling |
+| M6 | IA account login (S3 keys via `ia configure`, My favorites / My uploads, entitled downloads) and search sorting |
 
 Post-MVP additions along the way: access-restriction handling
 (lending-library items, private files), DRM labelling with Select-all
@@ -34,15 +35,6 @@ Non-code items, in rough order:
 
 Ordered roughly by value-for-effort; none are commitments.
 
-### IA account login
-`internetarchive` already handles S3-style credentials (`ia configure`);
-the session comes from `get_session()`, so stored credentials are one
-config step away. Unlocks: downloading formats that require a loan the
-user actually holds, a "My favorites" entry point (`fav-<username>`), and
-higher-fidelity access to the user's own uploads. Needs a credentials
-section in Preferences (never storing the password itself, only the
-S3 keys the `ia` tool uses).
-
 ### Grouped downloads view
 The queue is a flat per-file list; downloading 40 files from one item
 shows 40 rows. Group rows by item with an expander and per-item aggregate
@@ -57,9 +49,8 @@ probably per-item file-type filters (e.g. originals only). The biggest
 IA-citizenship surface in the app — design the throttling first.
 
 ### Search improvements
-Sort options (downloads, date, title — advanced search supports `sort[]`),
-a date-range filter, and a field-query builder for users who don't know
-Lucene syntax. Favorites browsing UI once login exists.
+A date-range filter and a field-query builder for users who don't know
+Lucene syntax.
 
 ### Downloads QoL
 Optional bandwidth limit; desktop notification on queue completion;

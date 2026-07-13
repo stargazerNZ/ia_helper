@@ -8,8 +8,8 @@ it identifies itself, limits concurrent connections, backs off when asked,
 verifies downloads against published checksums, and honors access
 restrictions on lending material.
 
-**Status:** MVP complete (v0.5.x). See [ROADMAP.md](ROADMAP.md) for what's
-next.
+**Status:** MVP complete plus account integration (v0.6.x). See
+[ROADMAP.md](ROADMAP.md) for what's next.
 
 ## Documentation
 
