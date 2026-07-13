@@ -15,9 +15,23 @@
     </p>
   </description>
   <launchable type="desktop-id">io.github.stargazernz.IAHelper.desktop</launchable>
+  <developer id="io.github.stargazernz">
+    <name>Joe Hallmark</name>
+  </developer>
   <url type="homepage">https://github.com/stargazerNZ/ia_helper</url>
+  <url type="bugtracker">https://github.com/stargazerNZ/ia_helper/issues</url>
   <content_rating type="oars-1.1"/>
+  <!-- TODO before Flathub submission: add <screenshots> with images hosted
+       at stable URLs (the repo must be public for raw.githubusercontent
+       links to work). -->
   <releases>
+    <release version="0.5.0" date="2026-07-13">
+      <description>
+        <p>Milestone 5: polish. App menu with About dialog and keyboard
+        shortcuts, search error page with retry, automatic backoff on
+        rate-limit responses, clearer list chips.</p>
+      </description>
+    </release>
     <release version="0.4.2" date="2026-07-13">
       <description>
         <p>Item pages show a clickable "Uploaded by" link that browses all of

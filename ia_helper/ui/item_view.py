@@ -172,11 +172,17 @@ class ItemView(Adw.NavigationPage):
         self._member_of_box.append(self._chip_flow)
         self._content_box.append(self._member_of_box)
 
-    def _add_chip(self, label: str, query: str, dim: bool = False):
-        button = Gtk.Button(label=label)
+    def _add_chip(self, label: str, query: str, list_chip: bool = False):
+        if list_chip:
+            button = Gtk.Button(
+                child=Adw.ButtonContent(
+                    icon_name="view-list-symbolic", label=label
+                ),
+                tooltip_text="Browse this curated list",
+            )
+        else:
+            button = Gtk.Button(label=label, tooltip_text="Browse this collection")
         button.add_css_class("pill")
-        if dim:
-            button.add_css_class("flat")
         button.connect("clicked", lambda *_: self._on_browse_query(query))
         self._chip_flow.append(button)
         self._member_of_box.set_visible(True)
@@ -388,7 +394,7 @@ class ItemView(Adw.NavigationPage):
 
     def _on_simplelists_loaded(self, memberships: list[SimpleListMembership]):
         for membership in memberships:
-            self._add_chip(membership.label, membership.to_query(), dim=True)
+            self._add_chip(membership.label, membership.to_query(), list_chip=True)
 
     def _apply_thumbnail(self, data):
         if data is None:

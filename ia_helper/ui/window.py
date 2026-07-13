@@ -1,6 +1,6 @@
-from gi.repository import Adw, Gtk
+from gi.repository import Adw, Gio, Gtk
 
-from .. import APP_NAME
+from .. import APP_ID, APP_NAME, PROJECT_URL, __version__
 from ..core.api import create_session
 from ..core.config import load_config
 from ..core.downloads import DownloadManager
@@ -58,11 +58,16 @@ class MainWindow(Adw.ApplicationWindow):
                 stack=self._view_stack, policy=Adw.ViewSwitcherPolicy.WIDE
             )
         )
-        settings_button = Gtk.Button(
-            icon_name="emblem-system-symbolic", tooltip_text="Preferences"
+        menu = Gio.Menu()
+        menu.append("Preferences", "win.preferences")
+        menu.append(f"About {APP_NAME}", "win.about")
+        header.pack_end(
+            Gtk.MenuButton(
+                icon_name="open-menu-symbolic",
+                menu_model=menu,
+                tooltip_text="Main menu",
+            )
         )
-        settings_button.connect("clicked", self._on_settings_clicked)
-        header.pack_end(settings_button)
 
         root_toolbar = Adw.ToolbarView()
         root_toolbar.add_top_bar(header)
@@ -76,8 +81,47 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_content(self._toast_overlay)
 
         self.connect("close-request", self._on_close_request)
+        self._install_actions()
+        self._search_view.grab_search_focus()
+
+    def _install_actions(self):
+        actions = [
+            ("preferences", lambda *_: self._on_settings_clicked(None)),
+            ("about", lambda *_: self._show_about()),
+            ("focus-search", lambda *_: self._focus_search()),
+            ("show-search", lambda *_: self._show_view("search")),
+            ("show-downloads", lambda *_: self.show_downloads()),
+        ]
+        for name, handler in actions:
+            action = Gio.SimpleAction.new(name, None)
+            action.connect("activate", handler)
+            self.add_action(action)
 
     # -- navigation -------------------------------------------------------
+
+    def _show_view(self, name: str) -> None:
+        self._navigation.pop_to_tag("root")
+        self._view_stack.set_visible_child_name(name)
+
+    def _focus_search(self) -> None:
+        self._show_view("search")
+        self._search_view.grab_search_focus()
+
+    def _show_about(self) -> None:
+        about = Adw.AboutDialog(
+            application_name=APP_NAME,
+            application_icon=APP_ID,
+            version=__version__,
+            website=PROJECT_URL,
+            issue_url=f"{PROJECT_URL}/issues",
+            developer_name="Joe Hallmark",
+            copyright="© 2026 Joe Hallmark",
+            comments=(
+                "Search and download from the Internet Archive, operating "
+                "within its usage guidelines."
+            ),
+        )
+        about.present(self)
 
     def open_item(self, result: SearchResult) -> None:
         page = ItemView(
@@ -92,14 +136,12 @@ class MainWindow(Adw.ApplicationWindow):
 
     def browse_query(self, query_text: str) -> None:
         """Jump back to the search page and run a grouping query
-        (collection:…, simplelists__…, fav-…)."""
-        self._navigation.pop_to_tag("root")
-        self._view_stack.set_visible_child_name("search")
+        (collection:…, simplelists__…, uploader:…, fav-…)."""
+        self._show_view("search")
         self._search_view.run_query_text(query_text)
 
     def show_downloads(self) -> None:
-        self._navigation.pop_to_tag("root")
-        self._view_stack.set_visible_child_name("downloads")
+        self._show_view("downloads")
 
     # -- downloads -----------------------------------------------------------
 

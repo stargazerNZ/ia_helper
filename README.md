@@ -7,7 +7,7 @@ operating within the Archive's
 it identifies itself with a descriptive User-Agent, limits concurrent
 connections, and caches thumbnails and metadata locally.
 
-**Status: Milestone 4** — packaging (Flatpak and .deb).
+**Status: Milestone 5** — polish. The MVP feature set is complete.
 
 ## Roadmap
 
@@ -16,8 +16,18 @@ connections, and caches thumbnails and metadata locally.
 | M1 ✓ | Walking skeleton: window, search, results list, thumbnails, paging |
 | M2 ✓ | Item view: metadata, file list with selection, "Member of" collections/lists |
 | M3 ✓ | Download manager: queue, progress, pause/resume, checksum verification |
-| **M4 (this)** | Packaging: Flatpak (primary), .deb (secondary) |
-| M5 | Polish: error states, keyboard navigation, Flathub submission |
+| M4 ✓ | Packaging: Flatpak (primary), .deb (secondary) |
+| **M5 (this)** | Polish: app menu/About, shortcuts, error states, rate-limit backoff |
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|---|---|
+| Ctrl+F | Focus the search entry (jumps to the Search view) |
+| Ctrl+1 / Ctrl+2 | Switch to Search / Downloads |
+| Ctrl+, | Preferences |
+| Ctrl+Q | Quit (persists the download queue) |
+| Alt+←, swipe, mouse back | Back from an item page (built into NavigationView) |
 
 Parked for post-MVP: query-based "sets of items" bulk downloads (Scrape API),
 uploads, metadata editing, Wayback Machine features.
@@ -129,6 +139,14 @@ sudo apt install devscripts debhelper dh-python python3-all \
 dpkg-buildpackage -us -uc -b
 sudo apt install ../ia-helper_*.deb
 ```
+
+## Error handling
+
+The shared session retries GETs with exponential backoff on HTTP 429 and
+5xx, honoring `Retry-After` — per the Archive's automated-access
+guidelines. A failed first search page shows a Retry page; a failed "Load
+more" keeps existing results and toasts. Mid-download failures surface in
+the queue and resume with a Range request on retry.
 
 ## Before publishing
 

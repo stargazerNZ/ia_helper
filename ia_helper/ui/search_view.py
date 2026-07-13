@@ -97,11 +97,23 @@ class SearchView(Gtk.Box):
             vexpand=True,
         )
 
+        retry_button = Gtk.Button(label="Retry", halign=Gtk.Align.CENTER)
+        retry_button.add_css_class("suggested-action")
+        retry_button.add_css_class("pill")
+        retry_button.connect("clicked", lambda *_: self._retry_search())
+        self._error_page = Adw.StatusPage(
+            title="Search failed",
+            icon_name="network-error-symbolic",
+            vexpand=True,
+            child=retry_button,
+        )
+
         self._scroller = Gtk.ScrolledWindow(vexpand=True)
         self._scroller.set_child(self._list_view)
 
         self._content_stack = Gtk.Stack(vexpand=True)
         self._content_stack.add_named(self._empty_page, "empty")
+        self._content_stack.add_named(self._error_page, "error")
         self._content_stack.add_named(self._scroller, "results")
         self._content_stack.set_visible_child_name("empty")
         self.append(self._content_stack)
@@ -232,6 +244,14 @@ class SearchView(Gtk.Box):
         self._mediatype_dropdown.set_selected(0)
         self._start_search()
 
+    def grab_search_focus(self):
+        self._entry.grab_focus()
+
+    def _retry_search(self):
+        if self._current_query is not None:
+            self._content_stack.set_visible_child_name("results")
+            self._fetch_page(1)
+
     def _selected_mediatype(self):
         return MEDIATYPES[self._mediatype_dropdown.get_selected()][1]
 
@@ -291,4 +311,10 @@ class SearchView(Gtk.Box):
             return
         self._spinner.stop()
         self._load_more_button.set_sensitive(True)
+        if self._store.get_n_items() == 0:
+            # First page failed: full-page error with Retry. A failed
+            # "Load more" keeps the results already on screen and just
+            # toasts; the button stays available to try again.
+            self._error_page.set_description(str(exc))
+            self._content_stack.set_visible_child_name("error")
         self._on_error(f"Search failed: {exc}")
