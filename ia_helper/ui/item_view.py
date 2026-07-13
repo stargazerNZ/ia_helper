@@ -40,6 +40,7 @@ class ItemView(Adw.NavigationPage):
         self._on_download = on_download
         self._details: ItemDetails | None = None
         self._all_rows: list[FileRow] = []
+        self._thumb_retried = False
 
         toolbar_view = Adw.ToolbarView()
         toolbar_view.add_top_bar(Adw.HeaderBar())
@@ -372,10 +373,7 @@ class ItemView(Adw.NavigationPage):
 
         self._stack.set_visible_child_name("content")
 
-        self._thumbs.fetch(
-            details.identifier,
-            lambda ident, data: GLib.idle_add(self._apply_thumbnail, data),
-        )
+        self._fetch_thumbnail()
         run_in_thread(
             lambda: self._client.get_simplelists(details.identifier),
             self._on_simplelists_loaded,
@@ -396,12 +394,28 @@ class ItemView(Adw.NavigationPage):
         for membership in memberships:
             self._add_chip(membership.label, membership.to_query(), list_chip=True)
 
+    def _fetch_thumbnail(self):
+        # Priority lane: the page's single image must not queue behind
+        # list-row thumbnail traffic.
+        self._thumbs.fetch(
+            self._identifier,
+            lambda ident, data: GLib.idle_add(self._apply_thumbnail, data),
+            priority=True,
+        )
+
     def _apply_thumbnail(self, data):
         if data is None:
             return
         try:
             texture = Gdk.Texture.new_from_bytes(GLib.Bytes.new(data))
         except GLib.Error:
+            # Undecodable bytes — usually a cache entry truncated by a
+            # crash before cache writes were atomic. Drop it and refetch
+            # fresh, once.
+            self._thumbs.invalidate(self._identifier)
+            if not self._thumb_retried:
+                self._thumb_retried = True
+                self._fetch_thumbnail()
             return
         self._picture.set_paintable(texture)
 

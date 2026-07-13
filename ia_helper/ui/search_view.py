@@ -233,6 +233,9 @@ class SearchView(Gtk.Box):
         try:
             texture = Gdk.Texture.new_from_bytes(GLib.Bytes.new(data))
         except GLib.Error:
+            # Undecodable bytes: drop the cache entry so the next bind of
+            # this identifier fetches clean instead of failing forever.
+            self._thumbs.invalidate(identifier)
             return
         row.picture.set_paintable(texture)
 

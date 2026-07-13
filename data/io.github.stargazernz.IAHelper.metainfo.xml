@@ -25,6 +25,14 @@
        at stable URLs (the repo must be public for raw.githubusercontent
        links to work). -->
   <releases>
+    <release version="0.6.1" date="2026-07-13">
+      <description>
+        <p>Fix item-page thumbnails that never appeared: corrupt cache
+        entries now self-heal (atomic writes, invalidate-and-retry), and the
+        item page's image loads on a priority lane instead of queueing
+        behind list thumbnails.</p>
+      </description>
+    </release>
     <release version="0.6.0" date="2026-07-13">
       <description>
         <p>Milestone 6: sign in with your archive.org account (My favorites,
