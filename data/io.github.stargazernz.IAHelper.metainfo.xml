@@ -4,7 +4,6 @@
   <name>IA Helper</name>
   <summary>Search and download from the Internet Archive</summary>
   <metadata_license>CC0-1.0</metadata_license>
-  <!-- TODO: pick the project license before publishing -->
   <project_license>GPL-3.0-or-later</project_license>
   <description>
     <p>
@@ -21,10 +20,31 @@
   <url type="homepage">https://github.com/stargazerNZ/ia_helper</url>
   <url type="bugtracker">https://github.com/stargazerNZ/ia_helper/issues</url>
   <content_rating type="oars-1.1"/>
-  <!-- TODO before Flathub submission: add <screenshots> with images hosted
-       at stable URLs (the repo must be public for raw.githubusercontent
-       links to work). -->
+  <!-- Screenshot images live in data/screenshots/ in the repo; the URLs
+       resolve once the repo is public (see RELEASING.md). -->
+  <screenshots>
+    <screenshot type="default">
+      <caption>Searching the Internet Archive</caption>
+      <image>https://raw.githubusercontent.com/stargazerNZ/ia_helper/main/data/screenshots/search.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Item details with file selection</caption>
+      <image>https://raw.githubusercontent.com/stargazerNZ/ia_helper/main/data/screenshots/item.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Downloads grouped by item</caption>
+      <image>https://raw.githubusercontent.com/stargazerNZ/ia_helper/main/data/screenshots/downloads.png</image>
+    </screenshot>
+  </screenshots>
   <releases>
+    <release version="1.0.0" date="2026-07-13">
+      <description>
+        <p>First public release: search with sorting and filters, item pages
+        with grouping navigation, verified resumable downloads grouped by
+        item, archive.org account sign-in, and full respect for access
+        restrictions on lending material.</p>
+      </description>
+    </release>
     <release version="0.7.0" date="2026-07-13">
       <description>
         <p>Downloads are now grouped by item, with aggregate progress and

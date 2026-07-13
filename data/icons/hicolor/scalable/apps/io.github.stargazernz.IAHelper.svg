@@ -1,21 +1,38 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Placeholder icon: a stylized archive building with a download arrow.
-     Replace with a real icon before publishing. -->
+<!-- IA Helper app icon: a classical archive building with a download badge.
+     Flat GNOME-ish style on a 128x128 grid. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <rect x="8" y="8" width="112" height="112" rx="20" fill="#241f31"/>
-  <!-- pediment -->
-  <path d="M 24 44 L 64 22 L 104 44 Z" fill="#f6f5f4"/>
-  <!-- columns -->
-  <rect x="30" y="50" width="10" height="36" fill="#f6f5f4"/>
-  <rect x="52" y="50" width="10" height="36" fill="#f6f5f4"/>
-  <rect x="74" y="50" width="10" height="36" fill="#f6f5f4"/>
-  <rect x="88" y="50" width="10" height="36" fill="#f6f5f4"/>
-  <!-- base -->
-  <rect x="24" y="92" width="80" height="10" fill="#f6f5f4"/>
-  <!-- download arrow -->
-  <g transform="translate(84,84)">
-    <circle cx="0" cy="0" r="22" fill="#3584e4"/>
-    <path d="M 0 -12 L 0 6 M -8 -2 L 0 8 L 8 -2" stroke="#ffffff" stroke-width="5"
-          stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3584e4"/>
+      <stop offset="1" stop-color="#1a5fb4"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background tile -->
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#bg)"/>
+  <!-- subtle top highlight -->
+  <rect x="8" y="8" width="112" height="56" rx="26" fill="#ffffff" opacity="0.06"/>
+
+  <!-- archive building -->
+  <g fill="#ffffff">
+    <!-- pediment -->
+    <path d="M 64 24 L 106 46 L 106 50 L 22 50 L 22 46 Z"/>
+    <!-- architrave -->
+    <rect x="26" y="54" width="76" height="6" rx="2"/>
+    <!-- columns -->
+    <rect x="30" y="64" width="9" height="28" rx="2.5"/>
+    <rect x="49.5" y="64" width="9" height="28" rx="2.5"/>
+    <rect x="69" y="64" width="9" height="28" rx="2.5"/>
+    <rect x="88.5" y="64" width="9" height="28" rx="2.5"/>
+    <!-- stylobate and steps -->
+    <rect x="26" y="96" width="76" height="6" rx="2"/>
+    <rect x="20" y="105" width="88" height="7" rx="2.5"/>
   </g>
+
+  <!-- download badge -->
+  <circle cx="91" cy="89" r="23" fill="#26a269" stroke="#ffffff" stroke-width="4"/>
+  <path d="M 91 78 L 91 97 M 83 89 L 91 98 L 99 89"
+        stroke="#ffffff" stroke-width="6" stroke-linecap="round"
+        stroke-linejoin="round" fill="none"/>
 </svg>

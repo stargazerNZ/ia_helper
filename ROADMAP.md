@@ -18,19 +18,17 @@ exclusion, uploader grouping, thumbnail queue cancellation fixes.
 
 ## Before first public release
 
-Non-code items, in rough order:
+See [RELEASING.md](RELEASING.md) for the full ordered procedure. Status:
 
-1. **License** — currently GPL-3.0-or-later as a placeholder in the
-   metainfo and `debian/copyright`; decide, add a `LICENSE` file, sync all
-   three.
-2. **Icon** — replace the placeholder SVG in
-   `data/icons/hicolor/scalable/apps/`.
-3. **Screenshots** — take on the VM, host at stable URLs, add
-   `<screenshots>` to the metainfo (Flathub requires them).
-4. **Repo public** — required for Flathub app-ID verification
-   (`io.github.stargazernz.IAHelper` ⇄ github.com/stargazerNZ/ia_helper).
-5. **Flathub submission** — run `appstreamcli validate` and
-   `desktop-file-validate` clean first.
+1. **License** ✓ — GPL-3.0-or-later; LICENSE file added, metainfo,
+   debian/copyright, and pyproject in sync.
+2. **Icon** ✓ — redrawn flat SVG (replaceable later without ceremony).
+3. **Screenshots** — take on the VM per RELEASING.md §1; metainfo slots
+   are wired to `data/screenshots/*.png`.
+4. **Repo public** — GitHub settings; required for Flathub app-ID
+   verification and screenshot URLs.
+5. **Tag v1.0.0 and submit to Flathub** — manifest ready in
+   `build-aux/flathub/`; validate first (RELEASING.md §2, §6–7).
 
 ## Future development candidates
 

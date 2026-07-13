@@ -6,9 +6,6 @@ Source: https://github.com/stargazerNZ/ia_helper
 Files: *
 Copyright: 2026 Joe Hallmark
 License: GPL-3.0+
-Comment: License is a placeholder pending a final decision (see README
- "Before publishing" checklist); keep debian/copyright, the metainfo, and
- any LICENSE file in sync when it is settled.
 
 License: GPL-3.0+
  This program is free software: you can redistribute it and/or modify

@@ -8,8 +8,11 @@ it identifies itself, limits concurrent connections, backs off when asked,
 verifies downloads against published checksums, and honors access
 restrictions on lending material.
 
-**Status:** MVP complete plus account integration (v0.6.x). See
+**Status:** preparing the first public release (v1.0.0) — see
+[RELEASING.md](RELEASING.md) for remaining steps and
 [ROADMAP.md](ROADMAP.md) for what's next.
+
+Licensed under the [GPL-3.0-or-later](LICENSE).
 
 ## Documentation
 

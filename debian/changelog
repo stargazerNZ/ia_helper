@@ -1,3 +1,11 @@
+ia-helper (1.0.0) unstable; urgency=medium
+
+  * First public release: account sign-in, search sorting, grouped
+    downloads view, hardened thumbnail cache, GPL-3.0-or-later license,
+    new icon, Flathub submission manifest.
+
+ -- Joe Hallmark <joe.hallmark@gmail.com>  Mon, 13 Jul 2026 12:00:00 +1200
+
 ia-helper (0.4.0) unstable; urgency=medium
 
   * Milestone 4: packaging.
