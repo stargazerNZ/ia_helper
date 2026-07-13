@@ -18,6 +18,13 @@
   <url type="homepage">https://github.com/stargazerNZ/ia_helper</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.4.1" date="2026-07-13">
+      <description>
+        <p>Fix delayed thumbnails when scrolling large result sets (e.g. big
+        collections): fetches for rows that scroll off screen are now
+        cancelled instead of blocking the visible ones.</p>
+      </description>
+    </release>
     <release version="0.4.0" date="2026-07-13">
       <description>
         <p>Milestone 4: packaging. Flatpak builds work out of the box with

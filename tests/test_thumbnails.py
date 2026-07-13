@@ -82,6 +82,24 @@ class TestThumbnailLoader(unittest.TestCase):
         self.assertEqual(calls, ["item-a"])
         self.assertEqual(session.calls, 1)
 
+    def test_cancelled_future_never_fetches(self):
+        session = BlockingSession()
+        loader = ThumbnailLoader(session, cache_dir=self.cache, max_workers=1)
+        calls = []
+
+        # Occupy the single worker, queue a second job, cancel just it —
+        # this is what row recycling does when a row scrolls off screen.
+        loader.fetch("item-a", lambda ident, data: calls.append(ident))
+        self.assertTrue(session.started.wait(timeout=5))
+        future = loader.fetch("item-b", lambda ident, data: calls.append(ident))
+        self.assertTrue(future.cancel())
+
+        session.release.set()
+        loader._executor.shutdown(wait=True)
+
+        self.assertEqual(calls, ["item-a"])
+        self.assertEqual(session.calls, 1)
+
     def test_fetches_after_cancel_run_normally(self):
         session = FakeSession()
         loader = ThumbnailLoader(session, cache_dir=self.cache, max_workers=1)

@@ -38,15 +38,20 @@ class ThumbnailLoader:
         # search's thumbnails would crawl through the queue behind them.
         self._generation = 0
 
-    def fetch(self, identifier: str, callback) -> None:
+    def fetch(self, identifier: str, callback):
         """Fetch a thumbnail asynchronously.
 
         ``callback(identifier, data_or_none)`` runs on a worker thread —
         UI callers must trampoline back to the main loop themselves.
-        Jobs still pending when cancel_pending() is called are dropped
-        without invoking the callback.
+
+        Returns the Future: callers should ``.cancel()`` it when the
+        requesting row leaves the screen (list rows are recycled while
+        scrolling, and every bind queues a job — without cancellation a
+        long scroll leaves the visible rows' fetches queued behind
+        hundreds of jobs for rows that no longer exist). Jobs pending at
+        cancel_pending() time are likewise dropped without a callback.
         """
-        self._executor.submit(self._fetch, self._generation, identifier, callback)
+        return self._executor.submit(self._fetch, self._generation, identifier, callback)
 
     def cancel_pending(self) -> None:
         """Drop queued-but-not-started fetches (e.g. on a new search)."""

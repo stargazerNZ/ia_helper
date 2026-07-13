@@ -80,6 +80,7 @@ class SearchView(Gtk.Box):
         factory = Gtk.SignalListItemFactory()
         factory.connect("setup", self._on_row_setup)
         factory.connect("bind", self._on_row_bind)
+        factory.connect("unbind", self._on_row_unbind)
 
         self._list_view = Gtk.ListView(
             model=Gtk.NoSelection(model=self._store),
@@ -185,13 +186,26 @@ class SearchView(Gtk.Box):
         row.detail.set_label(" · ".join(b for b in detail_bits if b))
 
         # Rows are recycled: tag with the identifier so a slow thumbnail for
-        # a previous occupant can't land on the wrong row.
+        # a previous occupant can't land on the wrong row, and cancel the
+        # previous occupant's fetch so scrolling a large result set doesn't
+        # build a queue of thumbnails nobody is looking at.
         row.identifier = result.identifier
         row.picture.set_paintable(None)
-        self._thumbs.fetch(
+        self._cancel_row_fetch(row)
+        row.thumb_future = self._thumbs.fetch(
             result.identifier,
             lambda ident, data: GLib.idle_add(self._apply_thumbnail, row, ident, data),
         )
+
+    def _on_row_unbind(self, _factory, list_item):
+        self._cancel_row_fetch(list_item.get_child())
+
+    @staticmethod
+    def _cancel_row_fetch(row):
+        future = getattr(row, "thumb_future", None)
+        if future is not None:
+            future.cancel()  # no-op if already running or done
+            row.thumb_future = None
 
     def _apply_thumbnail(self, row, identifier, data):
         if data is None or row.identifier != identifier:
