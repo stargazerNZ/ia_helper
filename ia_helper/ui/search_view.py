@@ -2,7 +2,7 @@
 
 from gi.repository import Adw, Gdk, Gio, GLib, GObject, Gtk, Pango
 
-from ..core.search import MEDIATYPES, SORTS, SearchQuery, SearchResult
+from ..core.search import LANGUAGES, MEDIATYPES, SORTS, SearchQuery, SearchResult
 from .format import format_size
 from .worker import run_in_thread
 
@@ -30,6 +30,9 @@ class SearchView(Gtk.Box):
 
         # Monotonic token: results from a superseded search are dropped.
         self._search_token = 0
+        # Guards against filter-change handlers re-running the search when
+        # dropdowns are set programmatically (run_query_text).
+        self._suppress_auto_search = False
         self._current_query: SearchQuery | None = None
         self._current_page = None
 
@@ -58,7 +61,22 @@ class SearchView(Gtk.Box):
             [label for label, _ in MEDIATYPES]
         )
         self._mediatype_dropdown.set_tooltip_text("Media type")
+        self._mediatype_dropdown.connect(
+            "notify::selected", self._on_filter_changed
+        )
         controls.append(self._mediatype_dropdown)
+
+        self._language_dropdown = Gtk.DropDown.new_from_strings(
+            [label for label, _ in LANGUAGES]
+        )
+        self._language_dropdown.set_tooltip_text(
+            "Language (per item metadata — items without a language label "
+            "are excluded when filtering)"
+        )
+        self._language_dropdown.connect(
+            "notify::selected", self._on_filter_changed
+        )
+        controls.append(self._language_dropdown)
 
         self._sort_dropdown = Gtk.DropDown.new_from_strings(
             [label for label, _ in SORTS]
@@ -266,6 +284,9 @@ class SearchView(Gtk.Box):
         mediatype = self._selected_mediatype()
         if mediatype:
             label_bits.append(f"({mediatype})")
+        if self._selected_language():
+            language_label = LANGUAGES[self._language_dropdown.get_selected()][0]
+            label_bits.append(f"({language_label})")
         self._on_bulk_requested(
             self._current_query.to_lucene(), " ".join(b for b in label_bits if b)
         )
@@ -276,7 +297,12 @@ class SearchView(Gtk.Box):
         The query is placed in the entry so the user can see and refine it.
         """
         self._entry.set_text(query_text)
-        self._mediatype_dropdown.set_selected(0)
+        self._suppress_auto_search = True
+        try:
+            self._mediatype_dropdown.set_selected(0)
+            self._language_dropdown.set_selected(0)
+        finally:
+            self._suppress_auto_search = False
         self._start_search()
 
     def grab_search_focus(self):
@@ -293,17 +319,28 @@ class SearchView(Gtk.Box):
     def _selected_sort(self):
         return SORTS[self._sort_dropdown.get_selected()][1]
 
+    def _selected_language(self):
+        return LANGUAGES[self._language_dropdown.get_selected()][1]
+
     def _on_sort_changed(self, *_args):
-        if self._current_query is not None:
+        if not self._suppress_auto_search and self._current_query is not None:
+            self._start_search()
+
+    def _on_filter_changed(self, *_args):
+        # Filters apply to the active search immediately (like sort).
+        if not self._suppress_auto_search and self._current_query is not None:
             self._start_search()
 
     def _start_search(self):
         text = self._entry.get_text().strip()
         mediatype = self._selected_mediatype()
-        if not text and not mediatype:
+        language = self._selected_language()
+        if not text and not mediatype and not language:
             return
 
-        self._current_query = SearchQuery(text=text, mediatype=mediatype)
+        self._current_query = SearchQuery(
+            text=text, mediatype=mediatype, language=language
+        )
         self._bulk_button.set_sensitive(True)
         # Drop thumbnail fetches still queued for the previous result set,
         # or the new results' thumbnails wait in line behind them.

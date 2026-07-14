@@ -44,6 +44,32 @@ SORTS = [
     ("Title (A–Z)", "titleSorter asc"),
 ]
 
+# (label, lucene clause) pairs for the UI language filter. None = any.
+# IA language metadata is uncontrolled: MARC codes ("eng"), ISO 639-1
+# ("en"), and English names ("English") coexist and match DIFFERENT item
+# sets (live-verified: language:eng and language:english differ by
+# thousands in feature_films), so each entry ORs the known variants.
+# Languages with two ISO 639-2 codes (ger/deu, fre/fra, …) include both.
+LANGUAGES = [
+    ("Any language", None),
+    ("English", "language:(eng OR en OR english)"),
+    ("French", "language:(fre OR fra OR fr OR french)"),
+    ("German", "language:(ger OR deu OR de OR german)"),
+    ("Spanish", "language:(spa OR es OR spanish)"),
+    ("Italian", "language:(ita OR it OR italian)"),
+    ("Portuguese", "language:(por OR pt OR portuguese)"),
+    ("Dutch", "language:(dut OR nld OR nl OR dutch)"),
+    ("Russian", "language:(rus OR ru OR russian)"),
+    ("Japanese", "language:(jpn OR ja OR japanese)"),
+    ("Chinese", "language:(chi OR zho OR zh OR chinese)"),
+    ("Korean", "language:(kor OR ko OR korean)"),
+    ("Arabic", "language:(ara OR ar OR arabic)"),
+    ("Hindi", "language:(hin OR hi OR hindi)"),
+    ("Polish", "language:(pol OR pl OR polish)"),
+    ("Swedish", "language:(swe OR sv OR swedish)"),
+    ("Latin", "language:(lat OR la OR latin)"),
+]
+
 # (label, mediatype value) pairs for the UI filter. None = no filter.
 MEDIATYPES = [
     ("All types", None),
@@ -63,6 +89,8 @@ class SearchQuery:
 
     text: str = ""
     mediatype: str | None = None
+    # A full lucene clause from LANGUAGES (e.g. "language:(eng OR …)").
+    language: str | None = None
     collection: str | None = None
     # (parent_identifier, list_name) — members of a simple list.
     simplelist: tuple[str, str] | None = None
@@ -73,6 +101,8 @@ class SearchQuery:
             parts.append(f"({self.text.strip()})")
         if self.mediatype:
             parts.append(f"mediatype:{self.mediatype}")
+        if self.language:
+            parts.append(self.language)
         if self.collection:
             parts.append(f"collection:{self.collection}")
         if self.simplelist:

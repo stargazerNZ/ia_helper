@@ -43,7 +43,9 @@ metadata crawl, so probably sampling-based).
 
 ### Search improvements
 A date-range filter and a field-query builder for users who don't know
-Lucene syntax.
+Lucene syntax. The controls row is near capacity (entry, mediatype,
+language, sort, search, bulk) — the next filter added should move the
+filters into a popover.
 
 ### Downloads QoL
 Optional bandwidth limit; desktop notification on queue completion;

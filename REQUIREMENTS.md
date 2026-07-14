@@ -25,6 +25,12 @@ in [ROADMAP.md](ROADMAP.md).
 - **R1.5** Results must be sortable: relevance (default), most downloaded,
   date (newest/oldest), recently added, title A–Z. Changing sort re-runs
   the active search.
+- **R1.6** A language filter must be offered (server-side query
+  refinement, so it composes with paging, sorting, and bulk downloads).
+  Because IA language metadata mixes MARC codes, ISO codes, and names,
+  each curated language ORs its known variants; because the metadata is
+  sparse, filtering excludes unlabelled items — a documented limitation.
+  Filter changes apply to the active search immediately.
 
 ## 2. Item view
 

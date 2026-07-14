@@ -3,6 +3,7 @@
 import unittest
 
 from ia_helper.core.search import (
+    LANGUAGES,
     RESULT_FIELDS,
     SearchClient,
     SearchPage,
@@ -52,6 +53,28 @@ class TestSearchQuery(unittest.TestCase):
     def test_empty_query_rejected(self):
         with self.assertRaises(ValueError):
             SearchQuery(text="   ").to_lucene()
+
+    def test_language_clause_appended(self):
+        english = dict(LANGUAGES)["English"]
+        query = SearchQuery(text="apollo", mediatype="movies", language=english)
+        self.assertEqual(
+            query.to_lucene(),
+            f"(apollo) AND mediatype:movies AND {english}",
+        )
+
+    def test_language_alone_is_valid(self):
+        english = dict(LANGUAGES)["English"]
+        self.assertEqual(SearchQuery(language=english).to_lucene(), english)
+
+    def test_languages_table_sane(self):
+        labels = [label for label, _ in LANGUAGES]
+        self.assertEqual(len(labels), len(set(labels)))
+        self.assertIsNone(LANGUAGES[0][1])  # "Any language" default
+        for label, clause in LANGUAGES[1:]:
+            self.assertTrue(clause.startswith("language:("), label)
+            self.assertTrue(clause.endswith(")"), label)
+            self.assertEqual(clause.count("("), clause.count(")"), label)
+            self.assertIn(" OR ", clause, label)
 
 
 class TestParseDoc(unittest.TestCase):
