@@ -103,6 +103,16 @@ class DownloadTask:
         self._cancel = threading.Event()
 
     @property
+    def is_self_manifest(self) -> bool:
+        """True for <identifier>_files.xml — the checksum manifest itself.
+
+        Its listed md5/size are inherently stale (the file can't contain
+        its own hash), so verification is skipped for it, matching the
+        official ia client. Live-verified: the listed md5 never matches.
+        """
+        return self.file_name == f"{self.identifier}_files.xml"
+
+    @property
     def part_path(self) -> Path:
         return self.dest.with_name(self.dest.name + ".part")
 
@@ -418,14 +428,19 @@ class DownloadManager:
                 self._finish(task, DownloadState.PAUSED)
                 return
 
-            if task.size and part.stat().st_size != task.size:
-                part.unlink(missing_ok=True)
-                self._finish(task, DownloadState.FAILED, "size mismatch after download")
-                return
-            if task.md5 and digest.hexdigest() != task.md5:
-                part.unlink(missing_ok=True)
-                self._finish(task, DownloadState.FAILED, "checksum verification failed")
-                return
+            if not task.is_self_manifest:
+                if task.size and part.stat().st_size != task.size:
+                    part.unlink(missing_ok=True)
+                    self._finish(
+                        task, DownloadState.FAILED, "size mismatch after download"
+                    )
+                    return
+                if task.md5 and digest.hexdigest() != task.md5:
+                    part.unlink(missing_ok=True)
+                    self._finish(
+                        task, DownloadState.FAILED, "checksum verification failed"
+                    )
+                    return
 
             task.dest.unlink(missing_ok=True)
             part.rename(task.dest)

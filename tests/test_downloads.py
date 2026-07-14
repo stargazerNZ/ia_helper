@@ -87,6 +87,27 @@ class TestDownloadRun(unittest.TestCase):
         self.assertEqual(task.dest.read_bytes(), CONTENT)
         self.assertFalse(task.part_path.exists())
 
+    def test_self_manifest_exempt_from_verification(self):
+        # <identifier>_files.xml IS the checksum manifest; its listed
+        # md5/size are inherently stale (live-verified). It must complete
+        # despite the mismatch — every other file still verifies strictly.
+        manager = make_manager(self.tmp)
+        (task,) = manager.enqueue(
+            "item1",
+            [entry(name="item1_files.xml", md5="0" * 32, size=999999)],
+        )
+        manager._run(task)
+        self.assertEqual(task.state, DownloadState.COMPLETED)
+        self.assertEqual(task.dest.read_bytes(), CONTENT)
+
+    def test_manifest_of_other_item_not_exempt(self):
+        manager = make_manager(self.tmp)
+        (task,) = manager.enqueue(
+            "item1", [entry(name="other_files.xml", md5="0" * 32)]
+        )
+        manager._run(task)
+        self.assertEqual(task.state, DownloadState.FAILED)
+
     def test_checksum_mismatch_fails_and_removes_part(self):
         manager = make_manager(self.tmp)
         (task,) = manager.enqueue("item1", [entry(md5="0" * 32)])

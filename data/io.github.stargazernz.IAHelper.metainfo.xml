@@ -37,6 +37,14 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.3.1" date="2026-07-14">
+      <description>
+        <p>Fix the spurious "checksum verification failed" on each item's
+        _files.xml: that file is the checksum manifest itself and can't
+        contain its own hash, so it is now exempt from verification, matching
+        the official ia client.</p>
+      </description>
+    </release>
     <release version="1.3.0" date="2026-07-14">
       <description>
         <p>Language filter for search: a curated language dropdown that
