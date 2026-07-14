@@ -243,13 +243,31 @@ class TestQueueBehaviour(unittest.TestCase):
 
 class TestSafeRelativePath(unittest.TestCase):
     def test_rejects_traversal_and_absolute(self):
-        for bad in ("../x", "a/../../x", "/etc/passwd", "", "c:evil"):
+        # "..." sanitizes to nothing (trailing dots stripped) → rejected;
+        # "???" sanitizes to "___" → kept (tested below).
+        for bad in ("../x", "a/../../x", "/etc/passwd", "", "..."):
             with self.assertRaises(ValueError, msg=bad):
                 safe_relative_path(bad)
+        self.assertEqual(str(safe_relative_path("???")), "___")
 
     def test_accepts_normal_and_nested(self):
         self.assertEqual(str(safe_relative_path("a.mpg")), "a.mpg")
         self.assertEqual(str(safe_relative_path("disc1/a.flac")), "disc1/a.flac")
+
+    def test_sanitizes_windows_unportable_names(self):
+        # NTFS-invalid characters become underscores on every platform,
+        # so download layouts stay identical across OSes.
+        self.assertEqual(str(safe_relative_path("what?.txt")), "what_.txt")
+        self.assertEqual(str(safe_relative_path('a"b<c>d|e*f.txt')), "a_b_c_d_e_f.txt")
+        self.assertEqual(str(safe_relative_path("c:evil")), "c_evil")
+        self.assertEqual(str(safe_relative_path("dir?/file:1.txt")), "dir_/file_1.txt")
+
+    def test_sanitizes_trailing_dots_spaces_and_reserved_names(self):
+        self.assertEqual(str(safe_relative_path("name. ")), "name")
+        self.assertEqual(str(safe_relative_path("CON.txt")), "_CON.txt")
+        self.assertEqual(str(safe_relative_path("com1/aux.log")), "_com1/_aux.log")
+        # Normal names that merely contain a reserved stem are untouched.
+        self.assertEqual(str(safe_relative_path("console.txt")), "console.txt")
 
 
 class TestTaskUrl(unittest.TestCase):

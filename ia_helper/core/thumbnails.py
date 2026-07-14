@@ -21,15 +21,15 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from .config import cache_dir
+
 THUMBNAIL_URL = "https://archive.org/services/img/{identifier}"
 
 _SAFE_CHARS = re.compile(r"[^A-Za-z0-9._-]")
 
 
 def default_cache_dir() -> Path:
-    xdg = os.environ.get("XDG_CACHE_HOME")
-    base = Path(xdg) if xdg else Path.home() / ".cache"
-    return base / "ia-helper" / "thumbnails"
+    return cache_dir() / "thumbnails"
 
 
 class ThumbnailLoader:

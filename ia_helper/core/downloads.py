@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import threading
 import time
 import uuid
@@ -44,12 +45,38 @@ class DownloadState(Enum):
 FINISHED_STATES = {DownloadState.COMPLETED, DownloadState.CANCELLED}
 
 
+# Characters NTFS forbids in file names (plus control chars). Sanitized on
+# every platform so download layouts are identical across OSes.
+_UNPORTABLE_CHARS = re.compile(r'[<>:"|?*\x00-\x1f]')
+# Windows reserved device names (as a bare stem, any extension).
+_RESERVED_NAMES = frozenset(
+    {"CON", "PRN", "AUX", "NUL"}
+    | {f"COM{n}" for n in range(1, 10)}
+    | {f"LPT{n}" for n in range(1, 10)}
+)
+
+
 def safe_relative_path(name: str) -> PurePosixPath:
-    """IA file names may contain subdirectories; they must stay relative."""
+    """Map an IA file name (may contain subdirectories) to a safe,
+    portable relative path.
+
+    Traversal and absolute paths are rejected; characters and names that
+    are invalid on Windows are sanitized rather than rejected, so the
+    original archive.org name still drives the download URL while the
+    local file gets a portable spelling.
+    """
     path = PurePosixPath(name)
-    if not name or path.is_absolute() or ".." in path.parts or ":" in name:
+    if not name or path.is_absolute() or ".." in path.parts:
         raise ValueError(f"unsafe file name: {name!r}")
-    return path
+    parts = []
+    for part in path.parts:
+        part = _UNPORTABLE_CHARS.sub("_", part).rstrip(" .")
+        if not part:
+            raise ValueError(f"unsafe file name: {name!r}")
+        if part.split(".", 1)[0].upper() in _RESERVED_NAMES:
+            part = "_" + part
+        parts.append(part)
+    return PurePosixPath(*parts)
 
 
 @dataclass

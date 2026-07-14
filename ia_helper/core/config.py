@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -21,12 +22,30 @@ def _xdg_dir(env_var: str, fallback: str) -> Path:
     return Path(value) if value else Path.home() / fallback
 
 
-def config_dir() -> Path:
+def _windows_dir(env_var: str, fallback: str) -> Path:
+    value = os.environ.get(env_var)
+    return Path(value) if value else Path.home() / "AppData" / fallback
+
+
+def config_dir(platform: str | None = None) -> Path:
+    """Per-user config directory (XDG on Unix, %APPDATA% on Windows)."""
+    if (platform or sys.platform) == "win32":
+        return _windows_dir("APPDATA", "Roaming") / APP_DIR_NAME
     return _xdg_dir("XDG_CONFIG_HOME", ".config") / APP_DIR_NAME
 
 
-def state_dir() -> Path:
+def state_dir(platform: str | None = None) -> Path:
+    """Per-user state directory (queue, bulk jobs)."""
+    if (platform or sys.platform) == "win32":
+        return _windows_dir("LOCALAPPDATA", "Local") / APP_DIR_NAME / "state"
     return _xdg_dir("XDG_STATE_HOME", ".local/state") / APP_DIR_NAME
+
+
+def cache_dir(platform: str | None = None) -> Path:
+    """Per-user cache directory (thumbnails)."""
+    if (platform or sys.platform) == "win32":
+        return _windows_dir("LOCALAPPDATA", "Local") / APP_DIR_NAME / "cache"
+    return _xdg_dir("XDG_CACHE_HOME", ".cache") / APP_DIR_NAME
 
 
 def default_download_dir() -> Path:
