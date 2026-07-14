@@ -98,8 +98,12 @@ class BulkDownloadDialog(Adw.Dialog):
         self._formats_list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
         self._formats_list.add_css_class("boxed-list")
         formats_scroller = Gtk.ScrolledWindow(
+            # Without a minimum, the dialog's height negotiation collapses
+            # the scroller to a single row; propagate_natural_height alone
+            # doesn't survive the Revealer/Dialog measurement chain.
+            min_content_height=240,
+            max_content_height=320,
             propagate_natural_height=True,
-            max_content_height=280,
             hscrollbar_policy=Gtk.PolicyType.NEVER,
             child=self._formats_list,
         )

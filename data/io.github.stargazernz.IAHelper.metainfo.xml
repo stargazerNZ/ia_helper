@@ -37,6 +37,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.2.1" date="2026-07-14">
+      <description>
+        <p>Fix the format picker collapsing to a single row.</p>
+      </description>
+    </release>
     <release version="1.2.0" date="2026-07-14">
       <description>
         <p>Bulk downloads can filter by file format (e.g. just the PDFs or
