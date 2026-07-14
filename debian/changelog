@@ -1,3 +1,14 @@
+ia-helper (1.2.1) unstable; urgency=medium
+
+  * Grouped downloads view: one expander per item with aggregate
+    progress and group pause/resume/cancel/open-folder.
+  * Bulk downloads: download everything matching a search, collection,
+    or uploader — survey with size confirmation, self-pacing queue
+    feeder, restriction-aware, pausable/resumable, cancel propagates to
+    the job's downloads, optional per-format filtering.
+
+ -- Joe Hallmark <joe.hallmark@gmail.com>  Tue, 14 Jul 2026 12:00:00 +1200
+
 ia-helper (1.0.0) unstable; urgency=medium
 
   * First public release: account sign-in, search sorting, grouped
