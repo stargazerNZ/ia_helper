@@ -173,8 +173,21 @@ class BulkManager:
         self._wake.set()
 
     def cancel(self, job: BulkJob) -> None:
-        if job.state not in BULK_FINISHED_STATES:
-            self._set_state(job, BulkJobState.CANCELLED)
+        """Cancel the job AND the unfinished downloads it spawned.
+
+        Completed files stay on disk. The sweep also runs from the feeder
+        once it acknowledges the cancellation, closing the window where an
+        item fetched at cancel time could still be in flight.
+        """
+        if job.state in BULK_FINISHED_STATES:
+            return
+        self._set_state(job, BulkJobState.CANCELLED)
+        self._cancel_job_tasks(job)
+
+    def _cancel_job_tasks(self, job: BulkJob) -> None:
+        for task in self._downloads.tasks():
+            if task.bulk_id == job.id and task.state not in FINISHED_STATES:
+                self._downloads.cancel(task)
 
     def clear_finished(self) -> None:
         with self._lock:
@@ -292,6 +305,10 @@ class BulkManager:
 
         if not self._interrupted(job):
             self._set_state(job, BulkJobState.COMPLETED)
+        elif job.state == BulkJobState.CANCELLED:
+            # Feeder-side sweep: catches tasks enqueued in the window
+            # between the user's cancel and this loop noticing it.
+            self._cancel_job_tasks(job)
 
     def _feed_item(self, job: BulkJob, identifier: str) -> None:
         details = self._items.get_item(identifier)
@@ -312,9 +329,12 @@ class BulkManager:
             if entry.size and dest.exists() and dest.stat().st_size == entry.size:
                 continue
             entries.append(entry)
-        if entries:
+        # Re-check: the user may have cancelled/paused during the metadata
+        # fetch above; don't enqueue on a dead job (the feeder-side sweep
+        # backstops this, but better never to queue at all).
+        if entries and not self._interrupted(job):
             created = self._downloads.enqueue(
-                identifier, entries, item_title=details.title
+                identifier, entries, item_title=details.title, bulk_id=job.id
             )
             job.enqueued_files += len(created)
 

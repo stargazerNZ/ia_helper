@@ -62,6 +62,9 @@ class DownloadTask:
     # Human-readable item title, for grouping in the UI. Optional —
     # tasks persisted before it existed fall back to the identifier.
     item_title: str = ""
+    # The bulk job that spawned this task ("" for manual downloads);
+    # cancelling a bulk job cancels its unfinished tasks by this tag.
+    bulk_id: str = ""
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
     state: DownloadState = DownloadState.QUEUED
     downloaded: int = 0
@@ -105,6 +108,7 @@ class DownloadTask:
             "size": self.size,
             "md5": self.md5,
             "item_title": self.item_title,
+            "bulk_id": self.bulk_id,
             "state": self.state.value,
             "error": self.error,
         }
@@ -118,6 +122,7 @@ class DownloadTask:
             size=int(raw.get("size") or 0),
             md5=raw.get("md5", ""),
             item_title=raw.get("item_title", ""),
+            bulk_id=raw.get("bulk_id", ""),
             id=raw.get("id") or uuid.uuid4().hex,
         )
         state = DownloadState(raw.get("state", "queued"))
@@ -160,7 +165,7 @@ class DownloadManager:
             return list(self._tasks)
 
     def enqueue(self, identifier: str, entries: list[FileEntry],
-                item_title: str = "") -> list[DownloadTask]:
+                item_title: str = "", bulk_id: str = "") -> list[DownloadTask]:
         created = []
         with self._lock:
             active_dests = {
@@ -186,6 +191,7 @@ class DownloadManager:
                     size=entry.size,
                     md5=entry.md5,
                     item_title=item_title,
+                    bulk_id=bulk_id,
                 )
                 if dest.exists() and (task.size == 0 or dest.stat().st_size == task.size):
                     task.state = DownloadState.COMPLETED

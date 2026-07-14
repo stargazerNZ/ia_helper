@@ -180,6 +180,70 @@ class TestBulkFeeder(unittest.TestCase):
         self.assertEqual(job.state, BulkJobState.PAUSED)
         self.assertEqual(job.processed_items, 1)
 
+    def test_cancel_sweeps_the_jobs_unfinished_downloads(self):
+        catalog = {"item1": details("item1", [entry("a.mpg"), entry("b.mpg")])}
+        manager = self.make_manager([[ScrapeItem("item1")]], catalog)
+        job = self.run_job(manager, total_items=1)
+        self.assertEqual(job.state, BulkJobState.COMPLETED)
+
+        # A manual download alongside the bulk ones must survive.
+        manual = self.downloads.enqueue("other", [entry("manual.mpg")])[0]
+        # One bulk task already finished: completed files stay completed.
+        bulk_tasks = [t for t in self.downloads.tasks() if t.bulk_id == job.id]
+        bulk_tasks[0].state = DownloadState.COMPLETED
+
+        job.state = BulkJobState.RUNNING  # re-arm so cancel() acts
+        manager.cancel(job)
+
+        self.assertEqual(job.state, BulkJobState.CANCELLED)
+        states = {t.file_name: t.state for t in self.downloads.tasks()}
+        self.assertEqual(states["a.mpg"], DownloadState.COMPLETED)
+        self.assertEqual(states["b.mpg"], DownloadState.CANCELLED)
+        self.assertEqual(states["manual.mpg"], DownloadState.QUEUED)
+
+    def test_cancel_mid_fetch_enqueues_nothing(self):
+        class CancellingItemClient(FakeItemClient):
+            def __init__(self, catalog, manager_ref):
+                super().__init__(catalog)
+                self.manager_ref = manager_ref
+
+            def get_item(self, identifier):
+                result = super().get_item(identifier)
+                # User hits cancel while this item's metadata is in flight.
+                self.manager_ref[0].cancel(self.manager_ref[0].jobs()[0])
+                return result
+
+        catalog = {"item1": details("item1", [entry("a.mpg")])}
+        manager_ref = []
+        manager = BulkManager(
+            scrape_client=FakeScrapeClient([[ScrapeItem("item1")]]),
+            item_client=CancellingItemClient(catalog, manager_ref),
+            download_manager=self.downloads,
+            state_path=self.tmp / "bulk.json",
+            autostart=False,
+            low_water=10_000,
+        )
+        manager_ref.append(manager)
+        job = manager.start("collection:x", "x", False, total_items=1)
+        manager._process_job(job)
+
+        self.assertEqual(job.state, BulkJobState.CANCELLED)
+        self.assertEqual(self.downloads.tasks(), [])
+
+    def test_bulk_id_persists(self):
+        created = self.downloads.enqueue(
+            "item1", [entry("a.mpg")], bulk_id="job42"
+        )
+        self.assertEqual(created[0].bulk_id, "job42")
+        reloaded = DownloadManager(
+            session=NoopSession(),
+            config=Config(download_dir=self.tmp / "dl",
+                          max_concurrent_downloads=1),
+            state_path=self.tmp / "queue.json",
+            autostart=False,
+        )
+        self.assertEqual(reloaded.tasks()[0].bulk_id, "job42")
+
     def test_repeated_failures_fail_the_job(self):
         pages = [[ScrapeItem(f"item{n}") for n in range(1, 8)]]
         manager = self.make_manager(pages, catalog={},
