@@ -189,6 +189,10 @@ class DownloadsView(Gtk.Box):
         if job.state == BulkJobState.FAILED and job.error:
             bits = [f"Failed — {job.error}"]
         bits.append(f"item {job.processed_items:,} of {job.total_items:,}")
+        if job.formats:
+            shown = ", ".join(job.formats[:2])
+            more = f" +{len(job.formats) - 2}" if len(job.formats) > 2 else ""
+            bits.append(f"{shown}{more}")
         if job.enqueued_files:
             bits.append(f"{job.enqueued_files:,} files queued")
         if job.skipped_restricted:

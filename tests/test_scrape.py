@@ -91,6 +91,27 @@ class TestScrapeClient(unittest.TestCase):
         self.assertEqual(parsed.item_size, 42)
         self.assertTrue(parsed.access_restricted)
 
+    def test_parse_item_formats_str_or_list(self):
+        as_list = parse_scrape_item(
+            {"identifier": "x", "format": ["Text PDF", "Comic Book RAR"]}
+        )
+        self.assertEqual(as_list.formats, ["Text PDF", "Comic Book RAR"])
+        as_str = parse_scrape_item({"identifier": "x", "format": "Text PDF"})
+        self.assertEqual(as_str.formats, ["Text PDF"])
+        self.assertEqual(parse_scrape_item({"identifier": "x"}).formats, [])
+
+    def test_survey_counts_formats_per_item(self):
+        session = FakeScrapeSession([[
+            {"identifier": "a", "format": ["Text PDF", "Comic Book RAR"]},
+            {"identifier": "b", "format": ["Text PDF"]},
+            {"identifier": "c", "format": "EPUB"},
+        ]])
+        survey = ScrapeClient(session).survey("collection:x")
+        self.assertEqual(
+            survey.formats,
+            {"Text PDF": 2, "Comic Book RAR": 1, "EPUB": 1},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

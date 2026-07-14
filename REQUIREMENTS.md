@@ -170,8 +170,12 @@ box:
   multi-terabyte mistake must need a human click to continue) and resume
   without re-fetching metadata for items already processed. Files already
   on disk are skipped silently.
-- **R10.6** "Original files only" must be offered (default on): derivative
-  files are usually bulk noise.
+- **R10.6** File selection modes: all files, original files only (default
+  — derivatives are usually bulk noise), or specific formats chosen from a
+  checklist harvested during the survey (per-format item counts shown, so
+  partial coverage across a mixed collection is visible before
+  confirming). Format matching uses IA's canonical format names, never
+  file extensions.
 
 ## Out of scope for the MVP
 

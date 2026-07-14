@@ -7,17 +7,20 @@ IA collections routinely run to terabytes (collection:dvdtray measures
 
 from gi.repository import Adw, Gtk
 
-from ..core.scrape import MAX_BULK_ITEMS, Survey
+from ..core.scrape import MAX_BULK_ITEMS, NOISE_FORMATS, Survey
 from .format import format_size
 from .worker import run_in_thread
+
+FILE_MODES = ["All files", "Original files only", "Specific formats…"]
+MODE_ALL, MODE_ORIGINALS, MODE_FORMATS = range(3)
 
 
 class BulkDownloadDialog(Adw.Dialog):
     def __init__(self, query: str, label: str, scrape_client, download_dir,
                  on_confirm):
-        """``on_confirm(query, label, original_only, total_items)`` runs when
-        the user explicitly queues the job."""
-        super().__init__(title="Bulk download", content_width=440)
+        """``on_confirm(query, label, original_only, formats, total_items)``
+        runs when the user explicitly queues the job."""
+        super().__init__(title="Bulk download", content_width=460)
         self._query = query
         self._label = label
         self._scrape = scrape_client
@@ -74,13 +77,14 @@ class BulkDownloadDialog(Adw.Dialog):
         group = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
         group.add_css_class("boxed-list")
 
-        self._original_switch = Adw.SwitchRow(
-            title="Original files only",
-            subtitle="Skip derivative files the Archive generated "
-                     "(smaller and usually what you want)",
-            active=True,
+        self._mode_row = Adw.ComboRow(
+            title="Files",
+            subtitle="Originals skip Archive-generated derivatives",
+            model=Gtk.StringList.new(FILE_MODES),
+            selected=MODE_ORIGINALS,
         )
-        group.append(self._original_switch)
+        self._mode_row.connect("notify::selected", lambda *_: self._on_mode_changed())
+        group.append(self._mode_row)
 
         dest_row = Adw.ActionRow(
             title="Destination",
@@ -88,6 +92,22 @@ class BulkDownloadDialog(Adw.Dialog):
         )
         group.append(dest_row)
         box.append(group)
+
+        # Format checklist, populated from the survey; shown only in
+        # "Specific formats…" mode.
+        self._formats_list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+        self._formats_list.add_css_class("boxed-list")
+        formats_scroller = Gtk.ScrolledWindow(
+            propagate_natural_height=True,
+            max_content_height=280,
+            hscrollbar_policy=Gtk.PolicyType.NEVER,
+            child=self._formats_list,
+        )
+        self._formats_revealer = Gtk.Revealer(
+            child=formats_scroller, reveal_child=False
+        )
+        box.append(self._formats_revealer)
+        self._format_switches: dict[str, Adw.SwitchRow] = {}
 
         note = Gtk.Label(
             xalign=0.0,
@@ -138,18 +158,72 @@ class BulkDownloadDialog(Adw.Dialog):
                 f"{'s' if survey.restricted != 1 else ''} will be skipped"
             )
         self._detail_label.set_label("\n".join(bits))
+        self._populate_formats(survey)
         self._stack.set_visible_child_name("confirm")
+
+    def _populate_formats(self, survey: Survey):
+        content = sorted(
+            ((fmt, n) for fmt, n in survey.formats.items()
+             if fmt not in NOISE_FORMATS),
+            key=lambda pair: (-pair[1], pair[0]),
+        )
+        noise = sorted(
+            ((fmt, n) for fmt, n in survey.formats.items()
+             if fmt in NOISE_FORMATS),
+            key=lambda pair: (-pair[1], pair[0]),
+        )
+
+        def make_switch(fmt, count):
+            row = Adw.SwitchRow(
+                title=fmt,
+                subtitle=f"{count:,} of {survey.items:,} items",
+            )
+            row.connect(
+                "notify::active", lambda *_: self._update_confirm_sensitivity()
+            )
+            self._format_switches[fmt] = row
+            return row
+
+        for fmt, count in content:
+            self._formats_list.append(make_switch(fmt, count))
+        if noise:
+            expander = Adw.ExpanderRow(
+                title="Technical formats",
+                subtitle="Metadata, OCR, torrents and other machinery",
+            )
+            for fmt, count in noise:
+                expander.add_row(make_switch(fmt, count))
+            self._formats_list.append(expander)
 
     def _on_survey_failed(self, exc):
         self._status_page.set_title("Couldn't measure the query")
         self._status_page.set_description(str(exc))
         self._stack.set_visible_child_name("status")
 
+    def _on_mode_changed(self):
+        self._formats_revealer.set_reveal_child(
+            self._mode_row.get_selected() == MODE_FORMATS
+        )
+        self._update_confirm_sensitivity()
+
+    def _selected_formats(self) -> list[str]:
+        return [
+            fmt for fmt, row in self._format_switches.items() if row.get_active()
+        ]
+
+    def _update_confirm_sensitivity(self):
+        if self._mode_row.get_selected() == MODE_FORMATS:
+            self._confirm_button.set_sensitive(bool(self._selected_formats()))
+        else:
+            self._confirm_button.set_sensitive(True)
+
     def _on_confirm_clicked(self, _button):
+        mode = self._mode_row.get_selected()
         self._on_confirm(
             self._query,
             self._label,
-            self._original_switch.get_active(),
+            mode == MODE_ORIGINALS,
+            self._selected_formats() if mode == MODE_FORMATS else [],
             self._survey.items,
         )
         self.close()

@@ -192,8 +192,10 @@ class MainWindow(Adw.ApplicationWindow):
         dialog.present(self)
 
     def _start_bulk(self, query: str, label: str, original_only: bool,
-                    total_items: int) -> None:
-        self._bulk_manager.start(query, label, original_only, total_items)
+                    formats: list, total_items: int) -> None:
+        self._bulk_manager.start(
+            query, label, original_only, total_items, formats=formats
+        )
         toast = Adw.Toast(title=f"Bulk download started: {label}")
         toast.set_button_label("View")
         toast.connect("button-clicked", lambda *_: self.show_downloads())

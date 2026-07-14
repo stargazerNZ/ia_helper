@@ -13,11 +13,50 @@ cursor. Two live-verified quirks shape this client:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib.parse import urlencode
 
 SCRAPE_URL = "https://archive.org/services/search/v1/scrape"
-SURVEY_FIELDS = "identifier,item_size,access-restricted-item"
+SURVEY_FIELDS = "identifier,item_size,access-restricted-item,format"
+
+# Machinery formats: real files, but rarely what a bulk download is after.
+# The dialog ranks these below content formats. (Names are IA-canonical —
+# the same strings appear in the search index and item file metadata.)
+NOISE_FORMATS = frozenset({
+    "Metadata",
+    "Item Tile",
+    "Archive BitTorrent",
+    "Scandata",
+    "DjVuTXT",
+    "Djvu XML",
+    "chOCR",
+    "hOCR",
+    "OCR Page Index",
+    "OCR Search Text",
+    "Page Numbers JSON",
+    "Abbyy GZ",
+    "Single Page Processed JP2 ZIP",
+    "Single Page Processed JP2 Tar",
+    "Single Page Processed JPEG ZIP",
+    "Single Page Processed JPEG Tar",
+    "MARC",
+    "MARC Source",
+    "MARC Binary",
+    "Dublin Core",
+    "Metadata Log",
+    "Columbia Peaks",
+    "Spectrogram",
+    "Essentia High GZ",
+    "Essentia Low GZ",
+    "JSON",
+    "Log",
+    "Backup ITEM_META",
+    "Web ARChive GZ",
+    "CDX Index",
+    "Item CDX Index",
+    "Item CDX Meta-Index",
+    "WARC CDX Index",
+})
 
 # Citizenship guardrail: refuse bulk jobs beyond this many items (also caps
 # survey traffic — 4 scrape requests). "Download half the Archive" queries
@@ -36,6 +75,8 @@ class ScrapeItem:
     identifier: str
     item_size: int = 0
     access_restricted: bool = False
+    # File formats the item contains, per the search index.
+    formats: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -45,15 +86,21 @@ class Survey:
     items: int = 0
     total_bytes: int = 0
     restricted: int = 0
+    # format -> number of items containing at least one file of it.
+    formats: dict[str, int] = field(default_factory=dict)
     # True when the query exceeds MAX_BULK_ITEMS and counting stopped.
     truncated: bool = False
 
 
 def parse_scrape_item(raw: dict) -> ScrapeItem:
+    formats = raw.get("format") or []
+    if isinstance(formats, str):
+        formats = [formats]
     return ScrapeItem(
         identifier=str(raw.get("identifier", "")),
         item_size=int(raw.get("item_size") or 0),
         access_restricted=_as_bool(raw.get("access-restricted-item")),
+        formats=[str(f) for f in formats],
     )
 
 
@@ -93,6 +140,8 @@ class ScrapeClient:
                 result.total_bytes += item.item_size
                 if item.access_restricted:
                     result.restricted += 1
+                for fmt in item.formats:
+                    result.formats[fmt] = result.formats.get(fmt, 0) + 1
             if result.items > max_items:
                 result.truncated = True
                 return result

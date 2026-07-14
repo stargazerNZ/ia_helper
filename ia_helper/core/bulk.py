@@ -64,6 +64,9 @@ class BulkJob:
     query: str
     label: str
     original_only: bool = False
+    # Exact IA format names to download; empty = no format filter.
+    # When set, it takes precedence over original_only.
+    formats: list[str] = field(default_factory=list)
     total_items: int = 0
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
     state: BulkJobState = BulkJobState.PAUSED
@@ -85,6 +88,7 @@ class BulkJob:
             "query": self.query,
             "label": self.label,
             "original_only": self.original_only,
+            "formats": self.formats,
             "total_items": self.total_items,
             "state": self.state.value,
             "processed_items": self.processed_items,
@@ -100,6 +104,7 @@ class BulkJob:
             query=raw["query"],
             label=raw.get("label") or raw["query"],
             original_only=bool(raw.get("original_only")),
+            formats=[str(f) for f in raw.get("formats") or []],
             total_items=int(raw.get("total_items") or 0),
             id=raw.get("id") or uuid.uuid4().hex,
         )
@@ -147,11 +152,12 @@ class BulkManager:
             return list(self._jobs)
 
     def start(self, query: str, label: str, original_only: bool,
-              total_items: int) -> BulkJob:
+              total_items: int, formats: list[str] | None = None) -> BulkJob:
         job = BulkJob(
             query=query,
             label=label,
             original_only=original_only,
+            formats=list(formats or []),
             total_items=total_items,
             state=BulkJobState.RUNNING,
         )
@@ -316,7 +322,10 @@ class BulkManager:
         for entry in details.files:
             if entry.private or entry.drm:
                 continue
-            if job.original_only and not entry.is_original:
+            if job.formats:
+                if entry.format not in job.formats:
+                    continue
+            elif job.original_only and not entry.is_original:
                 continue
             try:
                 relative = safe_relative_path(entry.name)

@@ -36,9 +36,10 @@ See [RELEASING.md](RELEASING.md) for the full ordered procedure. Status:
 Ordered roughly by value-for-effort; none are commitments.
 
 ### Bulk download refinements
-Shipped in M8; possible follow-ons: per-job file-format filters beyond
-originals-only, a bandwidth ceiling while a bulk job runs, and surfacing
-per-item failures for later retry.
+Shipped in M8 (plus format filters and cancel propagation); possible
+follow-ons: a bandwidth ceiling while a bulk job runs, surfacing per-item
+failures for later retry, and per-format size estimates (would need a
+metadata crawl, so probably sampling-based).
 
 ### Search improvements
 A date-range filter and a field-query builder for users who don't know

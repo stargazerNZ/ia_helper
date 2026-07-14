@@ -180,6 +180,47 @@ class TestBulkFeeder(unittest.TestCase):
         self.assertEqual(job.state, BulkJobState.PAUSED)
         self.assertEqual(job.processed_items, 1)
 
+    def test_format_filter_takes_precedence(self):
+        files = [
+            entry("comic.cbr", source="derivative", fmt="Comic Book RAR"),
+            entry("book.pdf", source="derivative", fmt="Text PDF"),
+            entry("scan.zip", source="original", fmt="Single Page Processed JP2 ZIP"),
+        ]
+        catalog = {"item1": details("item1", files)}
+        manager = self.make_manager([[ScrapeItem("item1")]], catalog)
+        job = manager.start("collection:x", "x", original_only=True,
+                            total_items=1, formats=["Comic Book RAR"])
+        manager._process_job(job)
+
+        # Formats override original_only: the derivative CBR is taken,
+        # the original scan ZIP is not.
+        names = [t.file_name for t in self.downloads.tasks()]
+        self.assertEqual(names, ["comic.cbr"])
+
+    def test_format_filter_item_with_no_matches_still_progresses(self):
+        catalog = {
+            "item1": details("item1", [entry("a.epub", fmt="EPUB")]),
+            "item2": details("item2", [entry("b.pdf", fmt="Text PDF")]),
+        }
+        pages = [[ScrapeItem("item1"), ScrapeItem("item2")]]
+        manager = self.make_manager(pages, catalog)
+        job = manager.start("collection:x", "x", False,
+                            total_items=2, formats=["Text PDF"])
+        manager._process_job(job)
+
+        self.assertEqual(job.state, BulkJobState.COMPLETED)
+        self.assertEqual(job.processed_items, 2)
+        names = [t.file_name for t in self.downloads.tasks()]
+        self.assertEqual(names, ["b.pdf"])
+
+    def test_formats_persist(self):
+        manager = self.make_manager([[]], catalog={})
+        manager.start("collection:x", "x", False, total_items=1,
+                      formats=["Text PDF", "EPUB"])
+        reloaded = self.make_manager([[]], catalog={})
+        (restored,) = reloaded.jobs()
+        self.assertEqual(restored.formats, ["Text PDF", "EPUB"])
+
     def test_cancel_sweeps_the_jobs_unfinished_downloads(self):
         catalog = {"item1": details("item1", [entry("a.mpg"), entry("b.mpg")])}
         manager = self.make_manager([[ScrapeItem("item1")]], catalog)

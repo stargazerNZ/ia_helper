@@ -37,6 +37,14 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.2.0" date="2026-07-14">
+      <description>
+        <p>Bulk downloads can filter by file format (e.g. just the PDFs or
+        comic archives of a collection), chosen from a checklist showing how
+        many items carry each format. Cancelling a bulk job now cancels its
+        queued downloads.</p>
+      </description>
+    </release>
     <release version="1.1.1" date="2026-07-14">
       <description>
         <p>Fix a crash when opening the bulk download dialog.</p>
