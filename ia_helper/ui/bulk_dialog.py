@@ -80,13 +80,13 @@ class BulkDownloadDialog(Adw.Dialog):
                      "(smaller and usually what you want)",
             active=True,
         )
-        group.add(self._original_switch)
+        group.append(self._original_switch)
 
         dest_row = Adw.ActionRow(
             title="Destination",
             subtitle=str(download_dir),
         )
-        group.add(dest_row)
+        group.append(dest_row)
         box.append(group)
 
         note = Gtk.Label(
