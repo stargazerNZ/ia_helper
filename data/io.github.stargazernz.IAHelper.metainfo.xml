@@ -37,6 +37,15 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.1.0" date="2026-07-14">
+      <description>
+        <p>Bulk downloads: download everything matching a search, a
+        collection, or an uploader. A survey shows the item count and total
+        size before anything is queued; the job feeds the queue gradually,
+        skips restricted material, and can be paused, resumed, and
+        cancelled.</p>
+      </description>
+    </release>
     <release version="1.0.0" date="2026-07-13">
       <description>
         <p>First public release: search with sorting and filters, item pages

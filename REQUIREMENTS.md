@@ -148,7 +148,32 @@ box:
   entitled files download. Signing in must not weaken R4 in any way —
   restriction handling is unchanged.
 
+## 10. Bulk downloads
+
+- **R10.1** The user must be able to bulk-download everything matching the
+  current search query (collections and uploaders being the primary
+  cases), via the Scrape API for result sets beyond advanced search's
+  pagination window.
+- **R10.2** Nothing may be queued before the user confirms a survey
+  showing the item count and total size (IA collections routinely measure
+  terabytes). Queries beyond 20,000 items must be refused with a prompt to
+  refine.
+- **R10.3** Bulk jobs must self-pace: at most one metadata fetch in
+  flight, feeding the download queue only as it drains (never flooding
+  the queue, the queue file, or the API). The finished-task history must
+  be pruned so thousands of files can stream through a bounded queue.
+- **R10.4** Restriction policy is unchanged in bulk (R4): restricted
+  items are skipped via the search-side flag without even fetching their
+  metadata; private files and DRM containers are excluded per item.
+- **R10.5** Bulk jobs must be pausable, cancellable, and resumable —
+  including across restarts, where they restore as PAUSED (a
+  multi-terabyte mistake must need a human click to continue) and resume
+  without re-fetching metadata for items already processed. Files already
+  on disk are skipped silently.
+- **R10.6** "Original files only" must be offered (default on): derivative
+  files are usually bulk noise.
+
 ## Out of scope for the MVP
 
-Uploads, metadata editing, reviews, Wayback Machine features, and
-query-based bulk downloads ("sets of items") — see [ROADMAP.md](ROADMAP.md).
+Uploads, metadata editing, reviews, and Wayback Machine features — see
+[ROADMAP.md](ROADMAP.md).

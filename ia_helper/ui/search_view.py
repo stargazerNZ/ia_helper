@@ -18,10 +18,12 @@ class ResultItem(GObject.Object):
 
 
 class SearchView(Gtk.Box):
-    def __init__(self, client, thumbs, on_error, on_item_activated):
+    def __init__(self, client, thumbs, on_error, on_item_activated,
+                 on_bulk_requested):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self._on_error = on_error
         self._on_item_activated = on_item_activated
+        self._on_bulk_requested = on_bulk_requested
 
         self._client = client
         self._thumbs = thumbs
@@ -70,6 +72,14 @@ class SearchView(Gtk.Box):
         search_button.add_css_class("suggested-action")
         search_button.connect("clicked", lambda *_: self._start_search())
         controls.append(search_button)
+
+        self._bulk_button = Gtk.Button(
+            icon_name="folder-download-symbolic",
+            tooltip_text="Bulk download everything matching this search…",
+            sensitive=False,
+        )
+        self._bulk_button.connect("clicked", self._on_bulk_clicked)
+        controls.append(self._bulk_button)
 
         self.append(controls)
 
@@ -246,6 +256,20 @@ class SearchView(Gtk.Box):
         if item is not None:
             self._on_item_activated(item.result)
 
+    def _on_bulk_clicked(self, _button):
+        if self._current_query is None:
+            return
+        # The scrape query must match what the user is looking at: the
+        # entry text plus the mediatype filter (sort is irrelevant to
+        # coverage).
+        label_bits = [self._entry.get_text().strip()]
+        mediatype = self._selected_mediatype()
+        if mediatype:
+            label_bits.append(f"({mediatype})")
+        self._on_bulk_requested(
+            self._current_query.to_lucene(), " ".join(b for b in label_bits if b)
+        )
+
     def run_query_text(self, query_text: str):
         """Run a raw Lucene query (used for collection/list browsing).
 
@@ -280,6 +304,7 @@ class SearchView(Gtk.Box):
             return
 
         self._current_query = SearchQuery(text=text, mediatype=mediatype)
+        self._bulk_button.set_sensitive(True)
         # Drop thumbnail fetches still queued for the previous result set,
         # or the new results' thumbnails wait in line behind them.
         self._thumbs.cancel_pending()

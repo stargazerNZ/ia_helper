@@ -12,12 +12,21 @@ directly. Queues are rebuilt wholesale only on "Clear finished".
 
 from gi.repository import Adw, Gio, GLib, Gtk
 
+from ..core.bulk import BULK_FINISHED_STATES, BulkJob, BulkJobState
 from ..core.downloads import (
     FINISHED_STATES,
     DownloadState,
     DownloadTask,
 )
 from .format import format_size
+
+BULK_STATE_LABELS = {
+    BulkJobState.RUNNING: "Feeding queue",
+    BulkJobState.PAUSED: "Paused",
+    BulkJobState.COMPLETED: "Completed",
+    BulkJobState.CANCELLED: "Cancelled",
+    BulkJobState.FAILED: "Failed",
+}
 
 STATE_LABELS = {
     DownloadState.QUEUED: "Queued",
@@ -33,14 +42,17 @@ RESUMABLE_STATES = (DownloadState.PAUSED, DownloadState.FAILED)
 
 
 class DownloadsView(Gtk.Box):
-    def __init__(self, manager, on_error):
+    def __init__(self, manager, bulk_manager, on_error):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self._manager = manager
+        self._bulk = bulk_manager
         self._on_error = on_error
         # identifier -> {"row", "tasks": {task.id: task}, buttons...}
         self._groups: dict[str, dict] = {}
         # task.id -> {"task", "row", "progress", "toggle", "cancel", "folder"}
         self._file_rows: dict[str, dict] = {}
+        # job.id -> {"job", "row", "progress", "toggle", "cancel"}
+        self._bulk_rows: dict[str, dict] = {}
 
         toolbar = Gtk.Box(
             orientation=Gtk.Orientation.HORIZONTAL,
@@ -59,6 +71,16 @@ class DownloadsView(Gtk.Box):
         toolbar.append(clear_button)
         self.append(toolbar)
 
+        self._bulk_list_box = Gtk.ListBox(
+            selection_mode=Gtk.SelectionMode.NONE,
+            valign=Gtk.Align.START,
+            margin_top=6,
+            margin_start=12,
+            margin_end=12,
+            visible=False,
+        )
+        self._bulk_list_box.add_css_class("boxed-list")
+
         self._list_box = Gtk.ListBox(
             selection_mode=Gtk.SelectionMode.NONE,
             valign=Gtk.Align.START,
@@ -69,7 +91,11 @@ class DownloadsView(Gtk.Box):
         )
         self._list_box.add_css_class("boxed-list")
 
-        clamp = Adw.Clamp(maximum_size=900, child=self._list_box)
+        lists_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        lists_box.append(self._bulk_list_box)
+        lists_box.append(self._list_box)
+
+        clamp = Adw.Clamp(maximum_size=900, child=lists_box)
         scroller = Gtk.ScrolledWindow(vexpand=True)
         scroller.set_child(clamp)
 
@@ -87,9 +113,15 @@ class DownloadsView(Gtk.Box):
 
         for task in manager.tasks():
             self._attach_task(task)
+        for job in bulk_manager.jobs():
+            self._attach_bulk_job(job)
         self._refresh_everything()
 
         manager.add_listener(self._on_task_event_threaded)
+        manager.add_structure_listener(
+            lambda: GLib.idle_add(self._rebuild_task_lists)
+        )
+        bulk_manager.add_listener(self._on_bulk_event_threaded)
 
     # -- manager events ----------------------------------------------------
 
@@ -103,7 +135,90 @@ class DownloadsView(Gtk.Box):
         self._update_group(task.identifier)
         self._refresh_chrome()
 
+    def _on_bulk_event_threaded(self, job: BulkJob):
+        GLib.idle_add(self._on_bulk_event, job)
+
+    def _on_bulk_event(self, job: BulkJob):
+        if job.id not in self._bulk_rows:
+            self._attach_bulk_job(job)
+        self._update_bulk_row(self._bulk_rows[job.id])
+        self._refresh_chrome()
+
     # -- construction ----------------------------------------------------------
+
+    def _attach_bulk_job(self, job: BulkJob):
+        row = Adw.ActionRow(title=f"Bulk: {job.label}")
+        row.set_title_lines(1)
+        row.set_subtitle_lines(1)
+        row.set_tooltip_text(job.query)
+
+        progress = Gtk.ProgressBar(valign=Gtk.Align.CENTER)
+        progress.set_size_request(110, -1)
+        row.add_suffix(progress)
+
+        toggle = Gtk.Button(valign=Gtk.Align.CENTER)
+        toggle.add_css_class("flat")
+        toggle.connect("clicked", lambda *_: self._toggle_bulk(job))
+        row.add_suffix(toggle)
+
+        cancel = Gtk.Button(
+            icon_name="process-stop-symbolic",
+            tooltip_text="Cancel bulk job",
+            valign=Gtk.Align.CENTER,
+        )
+        cancel.add_css_class("flat")
+        cancel.connect("clicked", lambda *_: self._bulk.cancel(job))
+        row.add_suffix(cancel)
+
+        record = {
+            "job": job,
+            "row": row,
+            "progress": progress,
+            "toggle": toggle,
+            "cancel": cancel,
+        }
+        self._bulk_rows[job.id] = record
+        self._bulk_list_box.append(row)
+        self._bulk_list_box.set_visible(True)
+        self._update_bulk_row(record)
+
+    def _update_bulk_row(self, record: dict):
+        job: BulkJob = record["job"]
+
+        bits = [BULK_STATE_LABELS[job.state]]
+        if job.state == BulkJobState.FAILED and job.error:
+            bits = [f"Failed — {job.error}"]
+        bits.append(f"item {job.processed_items:,} of {job.total_items:,}")
+        if job.enqueued_files:
+            bits.append(f"{job.enqueued_files:,} files queued")
+        if job.skipped_restricted:
+            bits.append(f"{job.skipped_restricted:,} restricted skipped")
+        if job.failed_items:
+            bits.append(f"{job.failed_items:,} items failed")
+        record["row"].set_subtitle(" · ".join(bits))
+
+        record["progress"].set_fraction(job.progress)
+        record["progress"].set_visible(job.state != BulkJobState.CANCELLED)
+
+        toggle = record["toggle"]
+        if job.state == BulkJobState.RUNNING:
+            toggle.set_icon_name("media-playback-pause-symbolic")
+            toggle.set_tooltip_text("Pause bulk job")
+            toggle.set_visible(True)
+        elif job.state in (BulkJobState.PAUSED, BulkJobState.FAILED):
+            toggle.set_icon_name("media-playback-start-symbolic")
+            toggle.set_tooltip_text("Resume bulk job")
+            toggle.set_visible(True)
+        else:
+            toggle.set_visible(False)
+
+        record["cancel"].set_visible(job.state not in BULK_FINISHED_STATES)
+
+    def _toggle_bulk(self, job: BulkJob):
+        if job.state == BulkJobState.RUNNING:
+            self._bulk.pause(job)
+        else:
+            self._bulk.resume(job)
 
     def _attach_task(self, task: DownloadTask):
         group = self._groups.get(task.identifier)
@@ -281,7 +396,8 @@ class DownloadsView(Gtk.Box):
 
     def _refresh_chrome(self):
         tasks = self._manager.tasks()
-        self._stack.set_visible_child_name("list" if tasks else "empty")
+        has_content = bool(tasks) or bool(self._bulk_rows)
+        self._stack.set_visible_child_name("list" if has_content else "empty")
         active = sum(1 for t in tasks if t.state in ACTIVE_STATES)
         done = sum(1 for t in tasks if t.state == DownloadState.COMPLETED)
         failed = sum(1 for t in tasks if t.state == DownloadState.FAILED)
@@ -317,7 +433,18 @@ class DownloadsView(Gtk.Box):
                 self._manager.cancel(task)
 
     def _clear_finished(self):
-        self._manager.clear_finished()
+        self._bulk.clear_finished()
+        self._manager.clear_finished()  # triggers _rebuild_task_lists
+        self._bulk_list_box.remove_all()
+        self._bulk_rows.clear()
+        for job in self._bulk.jobs():
+            self._attach_bulk_job(job)
+        self._bulk_list_box.set_visible(bool(self._bulk_rows))
+        self._refresh_chrome()
+
+    def _rebuild_task_lists(self):
+        """Full rebuild of the per-item groups; used when tasks are removed
+        (clear/prune) since row-level events only cover existing tasks."""
         self._list_box.remove_all()
         self._groups.clear()
         self._file_rows.clear()

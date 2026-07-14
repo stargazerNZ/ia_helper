@@ -143,6 +143,7 @@ class DownloadManager:
         self._lock = threading.RLock()
         self._tasks: list[DownloadTask] = []
         self._listeners: list = []
+        self._structure_listeners: list = []
         self._shutdown = False
         self._load()
         if autostart:
@@ -238,6 +239,36 @@ class DownloadManager:
         with self._lock:
             self._tasks = [t for t in self._tasks if t.state not in FINISHED_STATES]
         self._save()
+        self._notify_structure()
+
+    def prune_finished(self, max_kept: int) -> None:
+        """Drop the oldest finished tasks beyond ``max_kept``.
+
+        Bulk downloads stream thousands of files through the queue; without
+        pruning, the persisted queue (and the UI) grows unboundedly with
+        completed history.
+        """
+        removed = False
+        with self._lock:
+            finished = [t for t in self._tasks if t.state in FINISHED_STATES]
+            excess = len(finished) - max_kept
+            if excess > 0:
+                to_drop = {t.id for t in finished[:excess]}
+                self._tasks = [t for t in self._tasks if t.id not in to_drop]
+                removed = True
+        if removed:
+            self._save()
+            self._notify_structure()
+
+    def add_structure_listener(self, callback) -> None:
+        """callback() fires (possibly on a worker thread) when tasks are
+        REMOVED from the queue (clear/prune) — row-level listeners only
+        ever hear about tasks that still exist."""
+        self._structure_listeners.append(callback)
+
+    def _notify_structure(self) -> None:
+        for callback in self._structure_listeners:
+            callback()
 
     def set_max_concurrent(self, value: int) -> None:
         with self._lock:

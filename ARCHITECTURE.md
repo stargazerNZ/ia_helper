@@ -31,6 +31,11 @@ ia_helper/
     account.py             sign-in via internetarchive.configure() (S3 keys;
                            password never stored), check_auth who-am-i,
                            sign-out (credential sections removed from ia.ini)
+    scrape.py              Scrape API client: cursor paging (never sends
+                           count — live-verified server quirk), query survey
+    bulk.py                BulkManager: one feeder thread walks a query,
+                           throttled by queue low-water; skips restricted/
+                           private/DRM/already-downloaded; resumable
     config.py              Config dataclass; JSON load/save under XDG paths
   ui/                      GTK4/libadwaita; no direct archive.org access
     window.py              MainWindow: NavigationView (root ⇄ item pages),

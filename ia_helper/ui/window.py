@@ -3,11 +3,14 @@ from gi.repository import Adw, Gio, Gtk
 from .. import APP_ID, APP_NAME, PROJECT_URL, __version__
 from ..core import account
 from ..core.api import create_session
+from ..core.bulk import BulkManager
+from ..core.scrape import ScrapeClient
 from ..core.config import load_config
 from ..core.downloads import DownloadManager
 from ..core.items import ItemClient, ItemDetails
 from ..core.search import SearchClient, SearchResult
 from ..core.thumbnails import ThumbnailLoader
+from .bulk_dialog import BulkDownloadDialog
 from .downloads_view import DownloadsView
 from .item_view import ItemView
 from .search_view import SearchView
@@ -33,6 +36,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._item_client = ItemClient(self._session)
         self._thumbs = ThumbnailLoader(self._session)
         self._manager = DownloadManager(self._session, self._config)
+        self._scrape_client = ScrapeClient(self._session)
+        self._bulk_manager = BulkManager(
+            self._scrape_client, self._item_client, self._manager
+        )
 
         self._navigation = Adw.NavigationView()
 
@@ -41,9 +48,11 @@ class MainWindow(Adw.ApplicationWindow):
             thumbs=self._thumbs,
             on_error=self.show_error,
             on_item_activated=self.open_item,
+            on_bulk_requested=self.open_bulk_dialog,
         )
         self._downloads_view = DownloadsView(
             manager=self._manager,
+            bulk_manager=self._bulk_manager,
             on_error=self.show_error,
         )
 
@@ -172,6 +181,24 @@ class MainWindow(Adw.ApplicationWindow):
 
     # -- downloads -----------------------------------------------------------
 
+    def open_bulk_dialog(self, query: str, label: str) -> None:
+        dialog = BulkDownloadDialog(
+            query=query,
+            label=label,
+            scrape_client=self._scrape_client,
+            download_dir=self._config.download_dir,
+            on_confirm=self._start_bulk,
+        )
+        dialog.present(self)
+
+    def _start_bulk(self, query: str, label: str, original_only: bool,
+                    total_items: int) -> None:
+        self._bulk_manager.start(query, label, original_only, total_items)
+        toast = Adw.Toast(title=f"Bulk download started: {label}")
+        toast.set_button_label("View")
+        toast.connect("button-clicked", lambda *_: self.show_downloads())
+        self._toast_overlay.add_toast(toast)
+
     def enqueue_download(self, details: ItemDetails, entries) -> None:
         created = self._manager.enqueue(
             details.identifier, entries, item_title=details.title
@@ -199,6 +226,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._item_client.session = session
         self._thumbs.session = session
         self._manager.session = session
+        self._scrape_client.session = session
 
     def sign_in(self, email: str, password: str, on_done) -> None:
         """Async sign-in for the preferences dialog: exchanges the password
@@ -244,6 +272,7 @@ class MainWindow(Adw.ApplicationWindow):
         dialog.present(self)
 
     def _on_close_request(self, _window):
+        self._bulk_manager.shutdown()  # stop feeding before the queue stops
         self._manager.shutdown()
         self._thumbs.shutdown()
         return False  # allow the window to close

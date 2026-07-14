@@ -11,6 +11,7 @@
 | M5 | Polish: app menu, About/version, keyboard shortcuts, search error/retry states, 429/5xx backoff, chip styling |
 | M6 | IA account login (S3 keys via `ia configure`, My favorites / My uploads, entitled downloads) and search sorting |
 | M7 | Grouped downloads view: expander per item with aggregate progress and group pause/resume/cancel/open-folder |
+| M8 | Query-based bulk downloads: Scrape API survey + size confirmation, self-pacing feeder, restriction-aware, resumable |
 
 Post-MVP additions along the way: access-restriction handling
 (lending-library items, private files), DRM labelling with Select-all
@@ -34,13 +35,10 @@ See [RELEASING.md](RELEASING.md) for the full ordered procedure. Status:
 
 Ordered roughly by value-for-effort; none are commitments.
 
-### Query-based bulk downloads ("sets of items")
-The deliberately parked MVP feature: "download everything matching this
-query/collection". Needs the Scrape API (cursor-based, for result sets
-beyond advanced search's ~10k window), a mandatory size-preview
-confirmation step before queueing (items can be hundreds of GB), and
-probably per-item file-type filters (e.g. originals only). The biggest
-IA-citizenship surface in the app — design the throttling first.
+### Bulk download refinements
+Shipped in M8; possible follow-ons: per-job file-format filters beyond
+originals-only, a bandwidth ceiling while a bulk job runs, and surfacing
+per-item failures for later retry.
 
 ### Search improvements
 A date-range filter and a field-query builder for users who don't know
