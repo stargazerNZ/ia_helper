@@ -51,13 +51,17 @@ filters into a popover.
 Optional bandwidth limit; desktop notification on queue completion;
 re-verify a completed file on demand.
 
-### Windows port
-The core module is already portable (pathlib, no GTK, JSON persistence).
-Needs: GTK4/PyGObject via MSYS2 or gvsbuild, a decision on libadwaita vs
-plain-GTK chrome (the chrome is isolated for exactly this), Windows paths
-for config/state/cache (XDG fallbacks currently assume Unix), and an
-installer (MSYS2 packaging or WiX). The `.part`-rename and path-safety
-logic already anticipates NTFS constraints (drive-colon rejection).
+### Windows port — shipped (1.3.1)
+Runs via MSYS2 GTK4 + libadwaita; platform-aware app dirs and NTFS-safe
+file names landed in 1.3.1, and releases now carry an NSIS per-user
+installer plus a portable ZIP (built by `build-aux/windows/build.sh` —
+PyInstaller with explicit GTK collection; see the spec for the two
+build-machine traps it defuses: Git-for-Windows' GLib shadowing PATH
+resolution, and system DLLs leaking into the bundle). Remaining polish:
+bundle an emoji font (Pango fallback warnings), decide whether Adwaita
+styling on Windows warrants a plain-GTK chrome variant, test account
+sign-in on Windows, and consider code-signing the installer (SmartScreen
+will warn on unsigned downloads).
 
 ### Item view extras
 Inline preview for images/audio where formats allow; related-items

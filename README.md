@@ -22,6 +22,17 @@ Licensed under the [GPL-3.0-or-later](LICENSE).
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Code structure, threading model, API usage, design decisions |
 | [ROADMAP.md](ROADMAP.md) | Completed milestones, pre-release checklist, future candidates |
 
+## Windows
+
+Download the installer or portable ZIP from the
+[releases page](https://github.com/stargazerNZ/ia_helper/releases) —
+self-contained, no runtimes needed. To build it yourself (MSYS2 mingw64
+with gtk4/libadwaita/python-gobject/pyinstaller/nsis installed):
+
+```sh
+bash build-aux/windows/build.sh
+```
+
 ## Running (development, Linux)
 
 ```sh

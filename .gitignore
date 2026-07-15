@@ -6,5 +6,9 @@ build/
 dist/
 .venv/
 .flatpak-builder/
+build-aux/windows/build*/
+build-aux/windows/dist*/
+build-aux/windows/*.exe
+build-aux/windows/*.zip
 flatpak-build/
 repo/
