@@ -1,3 +1,14 @@
+ia-helper (1.3.1) unstable; urgency=medium
+
+  * Fix spurious "checksum verification failed" on each item's
+    _files.xml: the checksum manifest cannot contain its own hash, so it
+    is now exempt from verification (matching the official ia client).
+  * Windows port groundwork: platform-aware config/state/cache
+    directories, NTFS-safe download file names (sanitized identically on
+    all platforms).
+
+ -- Joe Hallmark <joe.hallmark@gmail.com>  Wed, 15 Jul 2026 09:00:00 +1200
+
 ia-helper (1.3.0) unstable; urgency=medium
 
   * Language filter for search: curated dropdown matching IA's mixed
