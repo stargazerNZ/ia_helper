@@ -8,7 +8,8 @@
 #   bash build-aux/windows/build.sh
 #
 # Needs (pacman): mingw-w64-x86_64-{gtk4,libadwaita,python,python-gobject,
-# python-pip,pyinstaller,nsis,librsvg,adwaita-icon-theme}.
+# python-pip,pyinstaller,librsvg,adwaita-icon-theme}, plus Inno Setup 6
+# (winget install JRSoftware.InnoSetup) for the installer.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -21,7 +22,15 @@ REPO="$(cd "$HERE/../.." && pwd)"
 export PATH="/c/msys64/mingw64/bin:$PATH"
 export MINGW_PREFIX="${MINGW_PREFIX:-C:/msys64/mingw64}"
 PYTHON="${IAHELPER_PYTHON:-$HOME/.venvs/ia_helper-win/bin/python.exe}"
-MAKENSIS="${MAKENSIS:-/mingw64/bin/makensis.exe}"
+ISCC="${ISCC:-}"
+if [ -z "$ISCC" ]; then
+    for candidate in \
+        "$LOCALAPPDATA/Programs/Inno Setup 6/ISCC.exe" \
+        "C:/Program Files (x86)/Inno Setup 6/ISCC.exe"; do
+        [ -f "$candidate" ] && ISCC="$candidate" && break
+    done
+fi
+[ -n "$ISCC" ] || { echo "Inno Setup 6 (ISCC.exe) not found" >&2; exit 1; }
 VERSION="$("$PYTHON" -c "import sys; sys.path.insert(0, r'$REPO'); import ia_helper; print(ia_helper.__version__)")"
 
 echo "== building IA Helper $VERSION for Windows =="
@@ -39,7 +48,7 @@ build 1
 # Release build (windowed).
 build 0
 
-"$MAKENSIS" -DVERSION="$VERSION" "$HERE/installer.nsi"
+"$ISCC" "/DVERSION=$VERSION" "/DDISTDIR=dist" "$HERE/installer.iss"
 
 echo "== artifacts =="
 ls -lh "$HERE"/ia-helper-*-setup.exe
