@@ -26,6 +26,13 @@ SetupIconFile=ia-helper.ico
 UninstallDisplayIcon={app}\ia-helper.exe
 Compression=lzma2/max
 SolidCompression=yes
+; Signing is configured by build.sh (/DSIGN plus an /Ssigntool= command)
+; once a certificate exists; with SignTool set, Inno also signs the
+; uninstaller. Without /DSIGN this compiles identically to an unsigned
+; build.
+#ifdef SIGN
+SignTool=signtool
+#endif
 OutputDir=.
 OutputBaseFilename=ia-helper-{#VERSION}-windows-x64-setup
 ArchitecturesAllowed=x64compatible

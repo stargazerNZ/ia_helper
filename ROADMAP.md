@@ -57,11 +57,14 @@ file names landed in 1.3.1, and releases now carry an NSIS per-user
 installer plus a portable ZIP (built by `build-aux/windows/build.sh` —
 PyInstaller with explicit GTK collection; see the spec for the two
 build-machine traps it defuses: Git-for-Windows' GLib shadowing PATH
-resolution, and system DLLs leaking into the bundle). Remaining polish:
-bundle an emoji font (Pango fallback warnings), decide whether Adwaita
-styling on Windows warrants a plain-GTK chrome variant, test account
-sign-in on Windows, and consider code-signing the installer (SmartScreen
-will warn on unsigned downloads).
+resolution, and system DLLs leaking into the bundle). Account sign-in verified
+on Windows (2026-07-16). Code signing: build hooks are in place
+(`IAHELPER_SIGN_ARGS`, see RELEASING.md) but the certificate is deferred
+until the repo goes public — SignPath Foundation (free for OSS, requires
+public repo) is the intended route; Azure is unavailable to individuals
+outside USA/Canada. Remaining polish: bundle an emoji font (Pango
+fallback warnings) and decide whether Adwaita styling on Windows warrants
+a plain-GTK chrome variant.
 
 ### Item view extras
 Inline preview for images/audio where formats allow; related-items
