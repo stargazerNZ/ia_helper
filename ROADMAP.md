@@ -41,6 +41,15 @@ follow-ons: a bandwidth ceiling while a bulk job runs, surfacing per-item
 failures for later retry, and per-format size estimates (would need a
 metadata crawl, so probably sampling-based).
 
+### Extend the fetch-watchdog pattern
+Search paging (`ui/search_view.py`) is the only async operation with a
+bounded recovery timer today (added 2026-07-17 fixing a spinner that
+could hang forever — see ARCHITECTURE.md's "Recovering from a stuck
+request"). The same arm/disarm/discard-via-token template would apply
+just as well to the item view's metadata fetch, the account sign-in
+call, and the bulk survey — worth doing if any of them are ever reported
+stuck, rather than pre-emptively.
+
 ### Search improvements
 A date-range filter and a field-query builder for users who don't know
 Lucene syntax. The controls row is near capacity (entry, mediatype,
