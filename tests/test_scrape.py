@@ -1,5 +1,6 @@
 """Scrape client tests — fake session, no network."""
 
+import threading
 import unittest
 from urllib.parse import parse_qs, urlparse
 
@@ -83,6 +84,46 @@ class TestScrapeClient(unittest.TestCase):
         self.assertTrue(survey.truncated)
         # Stopped after the first page — no second request issued.
         self.assertEqual(len(session.calls), 1)
+
+    def test_cancel_event_stops_before_next_page(self):
+        # 3 pages available; cancel before the survey even starts, so no
+        # request should be issued at all.
+        session = FakeScrapeSession(
+            [[item("a")], [item("b")], [item("c")]]
+        )
+        client = ScrapeClient(session)
+        cancel_event = threading.Event()
+        cancel_event.set()
+        pages = list(client.pages("collection:x", cancel_event=cancel_event))
+        self.assertEqual(pages, [])
+        self.assertEqual(session.calls, [])
+
+    def test_cancel_event_lets_inflight_page_finish_then_stops(self):
+        session = FakeScrapeSession(
+            [[item("a")], [item("b")], [item("c")]]
+        )
+        client = ScrapeClient(session)
+        cancel_event = threading.Event()
+        pages = []
+        for page in client.pages("collection:x", cancel_event=cancel_event):
+            pages.append(page)
+            if len(pages) == 1:
+                cancel_event.set()  # cancel after the first page arrives
+        # First page (already in flight/returned) is kept; the loop stops
+        # before requesting a second one.
+        self.assertEqual(len(pages), 1)
+        self.assertEqual(len(session.calls), 1)
+
+    def test_survey_partial_result_on_cancel(self):
+        session = FakeScrapeSession(
+            [[item("a", 1000)], [item("b", 2000)], [item("c", 3000)]]
+        )
+        client = ScrapeClient(session)
+        cancel_event = threading.Event()
+        cancel_event.set()
+        survey = client.survey("collection:x", cancel_event=cancel_event)
+        self.assertEqual(survey.items, 0)
+        self.assertFalse(survey.truncated)
 
     def test_parse_item(self):
         parsed = parse_scrape_item(

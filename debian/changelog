@@ -1,3 +1,17 @@
+ia-helper (1.3.2) unstable; urgency=medium
+
+  * Fix search "Load more" occasionally spinning forever with no new
+    results: a bounded watchdog now recovers the UI from a request that
+    never completes, discarding any late/stale response safely.
+  * Fix the 429/5xx retry-with-backoff policy silently never applying to
+    real archive.org requests (a more specific adapter mounted by the
+    internetarchive library shadowed it since it was first written).
+  * Bulk-download surveys now stop issuing further scrape requests once
+    their dialog is dismissed, instead of grinding to completion for a
+    window nobody is looking at.
+
+ -- Joe Hallmark <joe.hallmark@gmail.com>  Fri, 17 Jul 2026 09:00:00 +1200
+
 ia-helper (1.3.1) unstable; urgency=medium
 
   * Fix spurious "checksum verification failed" on each item's

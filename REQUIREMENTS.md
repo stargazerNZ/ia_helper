@@ -112,7 +112,12 @@ box:
   what has already been fetched.
 - **R6.5** Work the user can no longer see must be cancelled: pending
   thumbnail fetches are dropped on a new search and when their row scrolls
-  off screen.
+  off screen; a bulk-download survey stops issuing further scrape pages
+  once its dialog is dismissed.
+- **R6.6** No async operation may leave the UI waiting forever: a bounded
+  watchdog recovers search paging (spinner, controls, retryable error) if
+  a request never completes, without corrupting state if the original
+  call eventually does return late.
 
 ## 7. Application shell
 

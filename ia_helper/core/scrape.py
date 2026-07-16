@@ -13,6 +13,7 @@ cursor. Two live-verified quirks shape this client:
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from urllib.parse import urlencode
 
@@ -110,10 +111,19 @@ class ScrapeClient:
     def __init__(self, session):
         self.session = session
 
-    def pages(self, query: str, fields: str = SURVEY_FIELDS):
-        """Yield lists of ScrapeItem, one per scrape page, to exhaustion."""
+    def pages(self, query: str, fields: str = SURVEY_FIELDS,
+              cancel_event: threading.Event | None = None):
+        """Yield lists of ScrapeItem, one per scrape page, to exhaustion.
+
+        If ``cancel_event`` becomes set, stops before issuing the next
+        page request (an in-flight request already sent still completes
+        and is yielded — there is no way to abort it mid-flight, but no
+        further requests follow).
+        """
         cursor = None
         while True:
+            if cancel_event is not None and cancel_event.is_set():
+                return
             params = [("q", query), ("fields", fields)]
             if cursor:
                 params.append(("cursor", cursor))
@@ -127,14 +137,17 @@ class ScrapeClient:
             if not cursor:
                 return
 
-    def survey(self, query: str, max_items: int = MAX_BULK_ITEMS) -> Survey:
+    def survey(self, query: str, max_items: int = MAX_BULK_ITEMS,
+               cancel_event: threading.Event | None = None) -> Survey:
         """Measure a query: item count, total bytes, restricted count.
 
         Stops (with truncated=True) once max_items is exceeded so an
         overly broad query costs a handful of requests, not hundreds.
+        Stops early (with a partial, non-truncated result) if
+        cancel_event becomes set — e.g. the caller lost interest.
         """
         result = Survey()
-        for page in self.pages(query):
+        for page in self.pages(query, cancel_event=cancel_event):
             for item in page:
                 result.items += 1
                 result.total_bytes += item.item_size

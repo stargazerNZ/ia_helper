@@ -37,6 +37,15 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.3.2" date="2026-07-17">
+      <description>
+        <p>Fix search "Load more" occasionally spinning forever with no
+        results (a bounded watchdog now recovers it); fix the retry/backoff
+        policy silently never applying to real requests; bulk-download
+        surveys now stop issuing further requests once their dialog is
+        dismissed.</p>
+      </description>
+    </release>
     <release version="1.3.1" date="2026-07-14">
       <description>
         <p>Fix the spurious "checksum verification failed" on each item's

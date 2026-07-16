@@ -5,6 +5,8 @@ IA collections routinely run to terabytes (collection:dvdtray measures
 ~130 TB), so the size line is the whole point of this dialog.
 """
 
+import threading
+
 from gi.repository import Adw, Gtk
 
 from ..core.scrape import MAX_BULK_ITEMS, NOISE_FORMATS, Survey
@@ -26,6 +28,12 @@ class BulkDownloadDialog(Adw.Dialog):
         self._scrape = scrape_client
         self._on_confirm = on_confirm
         self._survey: Survey | None = None
+        # Set when the dialog closes (confirmed or dismissed) so the
+        # survey stops issuing further scrape pages once nobody is
+        # looking, and so a late callback doesn't touch closed-dialog
+        # widgets. An in-flight request already sent still completes.
+        self._cancel_event = threading.Event()
+        self.connect("closed", lambda *_: self._cancel_event.set())
 
         toolbar = Adw.ToolbarView()
         toolbar.add_top_bar(Adw.HeaderBar())
@@ -43,7 +51,7 @@ class BulkDownloadDialog(Adw.Dialog):
         self.set_child(toolbar)
 
         run_in_thread(
-            lambda: self._scrape.survey(self._query),
+            lambda: self._scrape.survey(self._query, cancel_event=self._cancel_event),
             self._on_survey_done,
             self._on_survey_failed,
         )
@@ -137,6 +145,8 @@ class BulkDownloadDialog(Adw.Dialog):
     # -- survey results ----------------------------------------------------
 
     def _on_survey_done(self, survey: Survey):
+        if self._cancel_event.is_set():
+            return  # dialog already closed; nothing to update
         self._survey = survey
         if survey.truncated:
             self._status_page.set_title("Query too broad")
@@ -200,6 +210,8 @@ class BulkDownloadDialog(Adw.Dialog):
             self._formats_list.append(expander)
 
     def _on_survey_failed(self, exc):
+        if self._cancel_event.is_set():
+            return  # dialog already closed; nothing to update
         self._status_page.set_title("Couldn't measure the query")
         self._status_page.set_description(str(exc))
         self._stack.set_visible_child_name("status")

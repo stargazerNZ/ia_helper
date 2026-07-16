@@ -8,6 +8,16 @@ from .worker import run_in_thread
 
 THUMB_SIZE = 64
 
+# Safety net so a stuck fetch can never spin the UI forever. Generous by
+# design: our session retries up to 3 times with a 30s per-attempt
+# timeout (~120s worst case) before backoff, and IA may legitimately ask
+# for a longer wait via Retry-After (honored, per its automated-access
+# guidelines) — this only fires for a genuinely stuck request, comfortably
+# beyond that budget. A late result arriving after the timeout is safely
+# discarded by the same token check that already guards superseded
+# searches.
+FETCH_TIMEOUT_SECONDS = 150
+
 
 class ResultItem(GObject.Object):
     """GObject wrapper so SearchResult dataclasses can live in a ListStore."""
@@ -35,6 +45,7 @@ class SearchView(Gtk.Box):
         self._suppress_auto_search = False
         self._current_query: SearchQuery | None = None
         self._current_page = None
+        self._fetch_watchdog_id = None
 
         self._build_controls()
         self._build_results_list()
@@ -363,6 +374,8 @@ class SearchView(Gtk.Box):
         self._spinner.start()
         self._load_more_button.set_sensitive(False)
 
+        self._arm_fetch_watchdog(token)
+
         sort = self._selected_sort()
         run_in_thread(
             lambda: self._client.search(query, page=page_number, sort=sort),
@@ -370,9 +383,44 @@ class SearchView(Gtk.Box):
             lambda exc: self._on_search_failed(token, exc),
         )
 
+    def _arm_fetch_watchdog(self, token):
+        # A prior watchdog, if any, belongs to a now-superseded fetch —
+        # only the current token's watchdog is armed here, so cancelling
+        # the wrong one is not a risk (see _cancel_fetch_watchdog callers).
+        if self._fetch_watchdog_id is not None:
+            GLib.source_remove(self._fetch_watchdog_id)
+        self._fetch_watchdog_id = GLib.timeout_add_seconds(
+            FETCH_TIMEOUT_SECONDS, lambda: self._on_fetch_timeout(token)
+        )
+
+    def _cancel_fetch_watchdog(self):
+        if self._fetch_watchdog_id is not None:
+            GLib.source_remove(self._fetch_watchdog_id)
+            self._fetch_watchdog_id = None
+
+    def _on_fetch_timeout(self, token):
+        self._fetch_watchdog_id = None
+        if token != self._search_token:
+            return GLib.SOURCE_REMOVE  # a newer fetch has since started
+        # Bump the token so a late result, if the stuck request eventually
+        # does complete, is discarded by the same check every other
+        # callback already uses — it can't land on now-reset state.
+        self._search_token += 1
+        self._spinner.stop()
+        self._load_more_button.set_sensitive(True)
+        if self._store.get_n_items() == 0:
+            self._error_page.set_description(
+                "The request took too long and was abandoned. Check your "
+                "connection and try again."
+            )
+            self._content_stack.set_visible_child_name("error")
+        self._on_error("Search timed out")
+        return GLib.SOURCE_REMOVE
+
     def _on_page_loaded(self, token, page):
         if token != self._search_token:
             return
+        self._cancel_fetch_watchdog()
         self._spinner.stop()
         self._load_more_button.set_sensitive(True)
 
@@ -390,6 +438,7 @@ class SearchView(Gtk.Box):
     def _on_search_failed(self, token, exc):
         if token != self._search_token:
             return
+        self._cancel_fetch_watchdog()
         self._spinner.stop()
         self._load_more_button.set_sensitive(True)
         if self._store.get_n_items() == 0:

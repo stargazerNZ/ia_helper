@@ -114,6 +114,46 @@ mechanism), which maps keys to the email and the `@itemname` that keys the
 backoff on 429/5xx honoring Retry-After, connection budget) are configured
 once in `core/api.py`, not per feature.
 
+`get_session()` pre-mounts its own adapter at the specific host prefix
+`"https://archive.org"`; a plain `session.mount("https://", ...)` is a
+*shorter* prefix, so requests' longest-prefix routing would silently never
+select it for any real archive.org call (found 2026-07-17 while chasing a
+UI hang — our retry policy had been dead code since it was written).
+`create_session()` instead reconfigures the adapter the library itself
+uses, via its `mount_http_adapter()` / `http_adapter_kwargs` API, so there
+is exactly one active policy and it's the one we intend.
+
+## Recovering from a stuck request
+
+Every async operation eventually calls back via `run_in_thread` — but nothing
+forces the underlying blocking call to *return*. If a request never
+completes (a network path that black-holes rather than erroring, or a
+legitimately long `Retry-After` wait), the naive pattern spins its trigger
+UI state (a spinner, a disabled button) forever, with no recovery but
+restarting the whole flow.
+
+`ui/search_view.py`'s paging (`_fetch_page`) is the one place this is
+guarded today: a `GLib.timeout_add_seconds` watchdog, armed alongside the
+fetch and keyed to the same monotonic token as the success/failure
+callbacks, fires after `FETCH_TIMEOUT_SECONDS` (150s — comfortably beyond
+the ~120s worst-case retry/backoff ladder, so it only trips on a genuine
+stall) and recovers the UI (stops the spinner, re-enables controls, shows
+a retryable error) by *bumping the token* rather than by cancelling
+anything. A background thread can't be safely killed mid-`requests.get()`,
+so the original call is left to finish or die on its own; if it ever does
+return, the existing token-mismatch check — the same one that already
+discards a superseded search — discards it as stale instead of landing on
+now-reset state. This pattern (arm on start, disarm on any real
+completion, discard-via-token on timeout) is the template if another
+async operation (item metadata, bulk survey) is ever found to need the
+same safety net.
+
+The bulk survey (`core/scrape.py`) uses a complementary but different
+tool: a `threading.Event` the dialog sets on close, checked between scrape
+pages (never mid-request) so a dismissed dialog stops issuing further page
+requests instead of grinding to completion for a window nobody's looking
+at.
+
 ## Persistence
 
 | File | Contents |
