@@ -137,9 +137,12 @@ box:
   the primary distribution (GNOME 48 runtime, sandbox limited to network,
   `xdg-download`, and display/GPU), with a Debian package secondary
   (Ubuntu 26.04+).
-- **R8.2** A future Windows port must remain feasible: all archive.org
-  logic lives in a GTK-free core module, and libadwaita use is confined to
-  swappable window chrome.
+- **R8.2** Windows is a secondary shipping target (installer + portable
+  ZIP, self-contained via PyInstaller): all archive.org logic lives in a
+  GTK-free core module, and libadwaita use is confined to swappable
+  window chrome, which is what made the port practical without a UI
+  rewrite. Platform-aware config/state/cache paths and NTFS-safe file
+  names are handled in `core/config.py` and `core/downloads.py`.
 - **R8.3** Core logic must be unit-testable without network access or a
   display server.
 

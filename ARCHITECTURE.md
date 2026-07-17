@@ -5,12 +5,14 @@
 **`core/` never imports GTK; `ui/` never talks to archive.org directly.**
 
 Everything else follows from this split: the archive.org logic is portable
-(future Windows port, potential CLI reuse) and unit-testable without a
-display server or network, while the UI layer stays a thin GTK4/libadwaita
-shell. Libadwaita use is deliberately confined to window chrome
-(`ApplicationWindow`, `HeaderBar`, `NavigationView`, `ViewStack`, toasts,
-status pages, dialogs) so a Windows build could swap it for plain GTK
-without touching behavior.
+(this is what made the Windows port and potential CLI reuse practical)
+and unit-testable without a display server or network, while the UI layer
+stays a thin GTK4/libadwaita shell. Libadwaita use is deliberately
+confined to window chrome (`ApplicationWindow`, `HeaderBar`,
+`NavigationView`, `ViewStack`, toasts, status pages, dialogs), which is
+why the same UI code runs unmodified on Windows via MSYS2's GTK4 build —
+see `build-aux/windows/` for the PyInstaller/Inno Setup packaging (not
+duplicated here; ROADMAP.md tracks the Windows-specific build findings).
 
 ## Module map
 
@@ -49,7 +51,11 @@ ia_helper/
     downloads_view.py      queue grouped by item (ExpanderRow per item,
                            aggregate progress, group + per-file controls);
                            trampolines manager events onto the main loop
-    settings.py            Adw.PreferencesDialog: download dir, concurrency
+    bulk_dialog.py         survey → confirm dialog for bulk downloads:
+                           size/item-count/format-coverage shown before
+                           anything is queued
+    settings.py            Adw.PreferencesDialog: download dir, concurrency,
+                           account sign-in/out
     format.py              size formatting
     worker.py              run_in_thread(): worker thread → GLib.idle_add
   main.py                  Adw.Application: actions, accelerators, --version
@@ -156,14 +162,19 @@ at.
 
 ## Persistence
 
-| File | Contents |
-|---|---|
-| `~/.config/ia-helper/config.json` | download dir, max concurrent downloads |
-| `~/.local/state/ia-helper/queue.json` | download queue (no progress ticks — progress recovers from `.part` sizes on load; RUNNING re-queues) |
-| `~/.cache/ia-helper/thumbnails/` | thumbnail bytes keyed by identifier |
+| File (Linux) | File (Windows) | Contents |
+|---|---|---|
+| `~/.config/ia-helper/config.json` | `%APPDATA%\ia-helper\config.json` | download dir, max concurrent downloads |
+| `~/.local/state/ia-helper/queue.json` | `%LOCALAPPDATA%\ia-helper\state\queue.json` | download queue (no progress ticks — progress recovers from `.part` sizes on load; RUNNING re-queues) |
+| `~/.local/state/ia-helper/bulk.json` | `%LOCALAPPDATA%\ia-helper\state\bulk.json` | bulk-download jobs (RUNNING restores as PAUSED, never auto-resumes) |
+| `~/.cache/ia-helper/thumbnails/` | `%LOCALAPPDATA%\ia-helper\cache\thumbnails\` | thumbnail bytes keyed by identifier |
 
-Plain JSON rather than GSettings is deliberate: no schema compilation, and
-identical behavior in a venv, a .deb, a Flatpak, and a future Windows build.
+`core/config.py` resolves the platform split (XDG on Linux, `%APPDATA%`/
+`%LOCALAPPDATA%` on Windows — the config/data split matches Windows
+convention, where roaming vs. local-only data are deliberately separate
+directories). Plain JSON rather than GSettings is deliberate: no schema
+compilation, and identical behavior in a venv, a .deb, a Flatpak, and the
+Windows build.
 
 ## Download integrity
 

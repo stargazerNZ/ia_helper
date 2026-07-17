@@ -1,15 +1,20 @@
 # IA Helper
 
-A GTK4/libadwaita application that simplifies searching for and downloading
-items, collections, and lists from the [Internet Archive](https://archive.org),
-operating within the Archive's
+A GTK4/libadwaita application that simplifies searching for, browsing, and
+bulk-downloading items, collections, and lists from the
+[Internet Archive](https://archive.org) — including downloading an entire
+collection or uploader's output in one confirmed action — operating within
+the Archive's
 [guidelines for automated access](https://archive.org/developers/index-apis.html):
 it identifies itself, limits concurrent connections, backs off when asked,
 verifies downloads against published checksums, and honors access
 restrictions on lending material.
 
-**Status:** preparing the first public release (v1.0.0) — see
-[RELEASING.md](RELEASING.md) for remaining steps and
+**Status:** feature-complete and released on GitHub for Linux (Flatpak,
+`.deb`) and Windows (installer, portable ZIP) — see the
+[releases page](https://github.com/stargazerNZ/ia_helper/releases) for
+downloads. Not yet on Flathub or publicly discoverable (repo is still
+private); see [RELEASING.md](RELEASING.md) for what's left and
 [ROADMAP.md](ROADMAP.md) for what's next.
 
 Licensed under the [GPL-3.0-or-later](LICENSE).
@@ -21,17 +26,25 @@ Licensed under the [GPL-3.0-or-later](LICENSE).
 | [REQUIREMENTS.md](REQUIREMENTS.md) | What the application does and the rules it follows |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Code structure, threading model, API usage, design decisions |
 | [ROADMAP.md](ROADMAP.md) | Completed milestones, pre-release checklist, future candidates |
+| [RELEASING.md](RELEASING.md) | How a release is cut (GitHub artifacts today; Flathub submission, still pending) |
 
 ## Windows
 
 Download the installer or portable ZIP from the
 [releases page](https://github.com/stargazerNZ/ia_helper/releases) —
-self-contained, no runtimes needed. To build it yourself (MSYS2 mingw64
-with gtk4/libadwaita/python-gobject/pyinstaller/nsis installed):
+self-contained, no runtimes needed. To build it yourself: MSYS2 mingw64
+with `gtk4`/`libadwaita`/`python-gobject`/`python-pip`/`pyinstaller`
+installed via pacman, plus [Inno Setup 6](https://jrsoftware.org/isinfo.php)
+(not a pacman package — install separately, e.g. `winget install
+JRSoftware.InnoSetup`) for the installer:
 
 ```sh
 bash build-aux/windows/build.sh
 ```
+
+See `build-aux/windows/ia-helper.spec` for why the build must go through
+this script rather than a raw PyInstaller invocation (PATH-order and
+system-DLL traps specific to this toolchain).
 
 ## Running (development, Linux)
 

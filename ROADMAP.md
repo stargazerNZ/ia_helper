@@ -17,9 +17,12 @@ Post-MVP additions along the way: access-restriction handling
 (lending-library items, private files), DRM labelling with Select-all
 exclusion, uploader grouping, thumbnail queue cancellation fixes.
 
-## Before first public release
+## Going public (Flathub, discoverability)
 
-See [RELEASING.md](RELEASING.md) for the full ordered procedure. Status:
+GitHub releases have been shipping normally since v1.0.0 (now at 1.3.3);
+this checklist is specifically about the repo going public and reaching
+Flathub — see [RELEASING.md](RELEASING.md) for the full ordered
+procedure. Status:
 
 1. **License** ✓ — GPL-3.0-or-later; LICENSE file added, metainfo,
    debian/copyright, and pyproject in sync.
@@ -28,8 +31,9 @@ See [RELEASING.md](RELEASING.md) for the full ordered procedure. Status:
    are wired to `data/screenshots/*.png`.
 4. **Repo public** — GitHub settings; required for Flathub app-ID
    verification and screenshot URLs.
-5. **Tag v1.0.0 and submit to Flathub** — manifest ready in
-   `build-aux/flathub/`; validate first (RELEASING.md §2, §6–7).
+5. **Submit to Flathub** — manifest ready in `build-aux/flathub/`,
+   builds from whatever tag is current at submission time; validate
+   first (RELEASING.md §2, §4–5 of the Flathub checklist).
 
 ## Future development candidates
 
@@ -62,8 +66,9 @@ re-verify a completed file on demand.
 
 ### Windows port — shipped (1.3.1)
 Runs via MSYS2 GTK4 + libadwaita; platform-aware app dirs and NTFS-safe
-file names landed in 1.3.1, and releases now carry an NSIS per-user
-installer plus a portable ZIP (built by `build-aux/windows/build.sh` —
+file names landed in 1.3.1, and releases now carry a per-user installer
+(Inno Setup — switched from an initial NSIS attempt for the more modern
+wizard UX) plus a portable ZIP (built by `build-aux/windows/build.sh` —
 PyInstaller with explicit GTK collection; see the spec for the two
 build-machine traps it defuses: Git-for-Windows' GLib shadowing PATH
 resolution, and system DLLs leaking into the bundle). Account sign-in verified
