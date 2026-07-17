@@ -67,7 +67,21 @@ installer plus a portable ZIP (built by `build-aux/windows/build.sh` —
 PyInstaller with explicit GTK collection; see the spec for the two
 build-machine traps it defuses: Git-for-Windows' GLib shadowing PATH
 resolution, and system DLLs leaking into the bundle). Account sign-in verified
-on Windows (2026-07-16). Code signing: build hooks are in place
+on Windows (2026-07-16). Launch time investigated (2026-07-17-18): with
+Defender real-time protection on, launch measured ~5-6s vs ~1-2s off —
+confirmed by trimming the bundle's typelib count from 75 to the 17
+actually required (queried authoritatively via GObject-Introspection's
+own dependency resolution, not guessed), cutting warm launch from
+~3.1-3.3s to ~2.4-2.5s. The DLL side was investigated and found NOT
+similarly trimmable: `objdump -p` shows GStreamer as a hard, non-delay-
+load import of this MSYS2 build's libgtk-4-1.dll, so it's mandatory for
+GTK to load at all regardless of whether video widgets are used — see
+ia-helper.spec's comments before re-attempting. Also fixed in the same
+pass: Inno Setup's installer only adds/overwrites files, it never
+removes ones a previous version shipped that the new one doesn't — an
+in-place upgrade was leaving old typelibs behind, undoing the trim for
+upgraders; `[InstallDelete]` now wipes the app directory before every
+install. Code signing: build hooks are in place
 (`IAHELPER_SIGN_ARGS`, see RELEASING.md) but the certificate is deferred
 until the repo goes public — SignPath Foundation (free for OSS, requires
 public repo) is the intended route; Azure is unavailable to individuals

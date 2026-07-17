@@ -42,6 +42,17 @@ ArchitecturesInstallIn64BitMode=x64compatible
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; \
     GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
+; Inno's default upgrade behavior only adds/overwrites files listed in
+; [Files] — it never removes something the PREVIOUS version installed
+; but the new one doesn't ship. For a PyInstaller bundle whose exact
+; file manifest can change release to release (discovered 2026-07-17:
+; trimming unused typelibs left 58 stale files behind on an in-place
+; upgrade, since the installer had no way to know they were gone),
+; wiping {app} first guarantees the installed tree always matches the
+; current build exactly, with no versioned-away cruft accumulating.
+[InstallDelete]
+Type: filesandordirs; Name: "{app}"
+
 [Files]
 Source: "{#DISTDIR}\ia-helper\*"; DestDir: "{app}"; \
     Flags: recursesubdirs ignoreversion

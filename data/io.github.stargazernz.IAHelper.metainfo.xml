@@ -37,6 +37,16 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.3.3" date="2026-07-18">
+      <description>
+        <p>Windows: faster launch. The bundle shipped ~75 introspection
+        typelibs from every library ever installed on the build machine;
+        trimmed to the 17 actually needed, cutting warm launch time by
+        roughly a quarter with antivirus real-time protection on. Also
+        fixed the installer leaving old files behind on an in-place
+        upgrade.</p>
+      </description>
+    </release>
     <release version="1.3.2" date="2026-07-17">
       <description>
         <p>Fix search "Load more" occasionally spinning forever with no
