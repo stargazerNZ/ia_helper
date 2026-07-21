@@ -101,6 +101,13 @@ plain text).
 
 ## Maintenance notes
 
+- **Release pipeline is automated** (2026-07-22):
+  `.github/workflows/release.yml` builds and drafts a GitHub release on
+  every `vX.Y.Z` tag push — see RELEASING.md for what it does and the
+  superseded manual recipe. When a Windows code-signing certificate
+  lands (see "Code signing (Windows)" in RELEASING.md), wire it in as a
+  `IAHELPER_SIGN_ARGS` repo secret passed to the `windows-artifacts` job's
+  environment rather than reinstating local-only signing.
 - Flatpak dependency pins: regenerate with
   `python3 build-aux/flatpak/update-python-deps.py` when the
   `internetarchive` tree changes; review the printed pins and commit.

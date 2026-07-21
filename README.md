@@ -13,8 +13,10 @@ restrictions on lending material.
 **Status:** feature-complete and released on GitHub for Linux (Flatpak,
 `.deb`) and Windows (installer, portable ZIP) — see the
 [releases page](https://github.com/stargazerNZ/ia_helper/releases) for
-downloads. Not yet on Flathub or publicly discoverable (repo is still
-private); see [RELEASING.md](RELEASING.md) for what's left and
+downloads. Releases build via GitHub Actions on tag push (all four
+artifacts, tested and verified, opened as a draft for review — see
+[RELEASING.md](RELEASING.md)). Not yet on Flathub or publicly
+discoverable (repo is still private); see
 [ROADMAP.md](ROADMAP.md) for what's next.
 
 Licensed under the [GPL-3.0-or-later](LICENSE).

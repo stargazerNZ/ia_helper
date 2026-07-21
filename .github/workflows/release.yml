@@ -1,0 +1,228 @@
+name: Release
+
+# Automates the procedure documented in RELEASING.md: on a version tag,
+# build all four artifacts (.deb, Flatpak bundle, Windows installer,
+# Windows portable ZIP), run the full install/launch/uninstall check that
+# previously caught a real Inno Setup bug, and open a DRAFT GitHub release
+# with everything attached plus a combined SHA256SUMS. Nothing is
+# published automatically — review the draft and click Publish.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build (e.g. v1.3.4)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - id: version
+        run: |
+          set -euo pipefail
+          TAG="${{ inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          INIT_VERSION="$(python3 -c "import re; print(re.search(r'__version__ = \"([^\"]+)\"', open('ia_helper/__init__.py').read()).group(1))")"
+          if [ "$VERSION" != "$INIT_VERSION" ]; then
+            echo "::error::tag $TAG (version $VERSION) does not match ia_helper/__init__.py's __version__ ($INIT_VERSION) — bump the version first" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: check-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check-version.outputs.tag }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - run: python -m unittest discover tests
+
+  linux-artifacts:
+    needs: [check-version, test]
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.check-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check-version.outputs.tag }}
+
+      - name: Build .deb
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y devscripts debhelper dh-python python3-all \
+              python3-setuptools pybuild-plugin-pyproject
+          dpkg-buildpackage -us -uc -b
+          mv ../ia-helper_*.deb .
+
+      - name: Verify .deb
+        run: dpkg -I ia-helper_*.deb
+
+      - name: Install Flatpak tooling
+        run: |
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --if-not-exists --user flathub \
+              https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      # The GNOME runtime/SDK are large (~1-2GB); caching them keeps
+      # re-runs fast. Keyed on the runtime version pinned in the manifest.
+      - name: Cache Flatpak runtime
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/flatpak
+          key: flatpak-gnome-48-${{ runner.os }}
+
+      - name: Install GNOME runtime/SDK
+        run: flatpak install --user -y flathub org.gnome.Platform//48 org.gnome.Sdk//48
+
+      - name: Build Flatpak bundle
+        run: |
+          set -euo pipefail
+          flatpak-builder --user --force-clean --repo=flatpak-repo flatpak-build \
+              build-aux/flatpak/io.github.stargazernz.IAHelper.json
+          flatpak build-bundle flatpak-repo \
+              "io.github.stargazernz.IAHelper-$VERSION.flatpak" \
+              io.github.stargazernz.IAHelper \
+              --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo
+
+      - name: Verify Flatpak bundle
+        run: |
+          set -euo pipefail
+          flatpak install --user -y --bundle "io.github.stargazernz.IAHelper-$VERSION.flatpak"
+          flatpak run io.github.stargazernz.IAHelper --version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifacts
+          path: |
+            ia-helper_*.deb
+            io.github.stargazernz.IAHelper-*.flatpak
+          if-no-files-found: error
+
+  windows-artifacts:
+    needs: [check-version, test]
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.check-version.outputs.version }}
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check-version.outputs.tag }}
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gtk4
+            mingw-w64-x86_64-libadwaita
+            mingw-w64-x86_64-python
+            mingw-w64-x86_64-python-gobject
+            mingw-w64-x86_64-python-pip
+            mingw-w64-x86_64-python-pyinstaller
+            mingw-w64-x86_64-librsvg
+            mingw-w64-x86_64-adwaita-icon-theme
+
+      - name: Ensure Inno Setup is available
+        shell: pwsh
+        run: |
+          $isccPaths = @(
+            "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          )
+          if (-not ($isccPaths | Where-Object { Test-Path $_ })) {
+            choco install innosetup -y --no-progress
+          }
+
+      - name: Set up build venv
+        run: |
+          set -euo pipefail
+          python -m venv --system-site-packages ~/.venvs/ia_helper-win
+          ~/.venvs/ia_helper-win/bin/python -m pip install internetarchive
+
+      - name: Build installer + portable tree
+        run: build-aux/windows/build.sh
+
+      - name: Zip portable build
+        shell: pwsh
+        run: |
+          Compress-Archive -Path build-aux\windows\dist\ia-helper\* `
+              -DestinationPath "ia-helper-$env:VERSION-windows-x64-portable.zip"
+
+      # Mirrors the manual verification in RELEASING.md that once caught a
+      # real bug (Inno Setup leaving a previous version's files behind on
+      # upgrade) — kept as an automated gate rather than relying solely on
+      # a human re-running it before every release.
+      - name: Install / launch / uninstall verification
+        shell: pwsh
+        run: |
+          $setup = "build-aux\windows\ia-helper-$env:VERSION-windows-x64-setup.exe"
+          $installDir = "$env:LOCALAPPDATA\Programs\IA Helper"
+
+          Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES" -Wait
+          if (-not (Test-Path "$installDir\ia-helper.exe")) {
+            throw "install did not produce $installDir\ia-helper.exe"
+          }
+
+          & "$installDir\ia-helper.exe" --version
+          if ($LASTEXITCODE -ne 0) { throw "installed exe --version exited $LASTEXITCODE" }
+
+          $uninst = Get-ChildItem -Path $installDir -Filter "unins*.exe" | Select-Object -First 1
+          if (-not $uninst) { throw "no uninstaller found in $installDir" }
+          Start-Process -FilePath $uninst.FullName -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES" -Wait
+          Start-Sleep -Seconds 2
+          if (Test-Path $installDir) { throw "uninstall left files behind: $installDir" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifacts
+          path: |
+            build-aux/windows/ia-helper-*-windows-x64-setup.exe
+            ia-helper-*-windows-x64-portable.zip
+          if-no-files-found: error
+
+  publish:
+    needs: [check-version, linux-artifacts, windows-artifacts]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: artifacts
+        run: sha256sum * > SHA256SUMS
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ needs.check-version.outputs.tag }}" \
+              --draft --generate-notes \
+              --title "IA Helper ${{ needs.check-version.outputs.version }}" \
+              --repo "${{ github.repository }}" \
+              artifacts/*

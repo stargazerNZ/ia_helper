@@ -1,69 +1,86 @@
 # Releasing IA Helper
 
 Two separate things live in this document: the **GitHub release
-procedure** (used for every release so far, v1.0.0 through the current
-version — see `ia_helper/__init__.py` for what that is) and the
-**going-public / Flathub checklist** (still pending — the repo is
-private and the app isn't on Flathub yet).
+procedure** (automated since 2026-07-22 by
+[`.github/workflows/release.yml`](.github/workflows/release.yml); v1.0.0
+through v1.3.3 were built by hand before that — see `ia_helper/__init__.py`
+for the current version) and the **going-public / Flathub checklist**
+(still pending — the repo is private and the app isn't on Flathub yet).
 
 ## GitHub release procedure (repeat for every version)
-
-This is the actual recipe used each time, combining a local WSL Ubuntu
-environment (for the Linux artifacts) and MSYS2 on the same Windows box
-(for Windows). No CI is involved; everything is built and verified by
-hand before publishing.
 
 1. **Bump the version** in `ia_helper/__init__.py`, `pyproject.toml`, add
    a `<release>` entry to the metainfo, and add a `debian/changelog`
    entry. Commit and push to `main`.
 2. **Tag and push**: `git tag -a vX.Y.Z -m "IA Helper X.Y.Z"` then
-   `git push origin vX.Y.Z`.
-3. **Linux artifacts, in a WSL Ubuntu clone** (kept at `~/ia_helper-release`
-   in WSL, separate from the Windows working copy — see
-   ARCHITECTURE.md/ROADMAP.md for why a WSL clone specifically):
-   ```sh
-   cd ~/ia_helper-release && git fetch -q origin && git checkout vX.Y.Z
-   dpkg-buildpackage -us -uc -b
-   flatpak-builder --user --force-clean --repo=flatpak-repo flatpak-build \
-       build-aux/flatpak/io.github.stargazernz.IAHelper.json
-   flatpak build-bundle flatpak-repo io.github.stargazernz.IAHelper-X.Y.Z.flatpak \
-       io.github.stargazernz.IAHelper --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo
-   ```
-   Verify: `flatpak install` the bundle and run `--version`; `dpkg -I` the
-   `.deb` and check its `Version` field.
-4. **Windows artifacts**, from an MSYS2-capable shell on Windows:
-   ```sh
-   bash build-aux/windows/build.sh   # console smoke test, windowed build, installer
-   ```
-   Then zip the portable tree:
-   `Compress-Archive -Path build-aux\windows\dist\ia-helper\* -DestinationPath ia-helper-X.Y.Z-windows-x64-portable.zip`.
-   Verify with a **full silent install/launch/uninstall cycle** — this
-   caught a real bug once (Inno Setup leaving a previous version's files
-   behind on upgrade; see ROADMAP.md):
-   ```powershell
-   .\ia-helper-X.Y.Z-windows-x64-setup.exe /VERYSILENT /SUPPRESSMSGBOXES
-   # confirm exe/shortcut/registry version, launch it, then:
-   & "$env:LOCALAPPDATA\Programs\IA Helper\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES
-   # confirm registry entry and install dir are both gone
-   ```
-5. **Checksums**: `sha256sum` all four binaries (`.deb`, `.flatpak`,
-   `-setup.exe`, `-portable.zip`) into one `SHA256SUMS` file.
-6. **Publish**:
-   ```sh
-   gh release create vX.Y.Z --title "IA Helper X.Y.Z" --notes-file notes.md \
-       ia-helper_X.Y.Z_all.deb io.github.stargazernz.IAHelper-X.Y.Z.flatpak \
-       ia-helper-X.Y.Z-windows-x64-setup.exe ia-helper-X.Y.Z-windows-x64-portable.zip \
-       SHA256SUMS --repo stargazerNZ/ia_helper
-   ```
-   `gh release view --json ... /releases/tags/vX.Y.Z` is occasionally
-   flaky (GitHub's "Unicorn" transient-error page) even when the release
-   itself is fine — if so, verify via `gh api repos/.../releases` (list,
-   not tag-lookup) and `gh api repos/.../releases/<id>/assets` instead.
+   `git push origin vX.Y.Z`. This triggers the `Release` workflow, which:
+   - refuses to proceed if the tag doesn't match `__init__.py`'s
+     `__version__` (catches a forgotten version bump before anything
+     builds);
+   - runs the test suite;
+   - builds the `.deb` and Flatpak bundle on an Ubuntu runner, and
+     installs each to confirm `--version`/`dpkg -I` before uploading;
+   - builds the Windows installer and portable ZIP on a Windows runner
+     via MSYS2 (mirroring `build-aux/windows/build.sh` exactly), then
+     runs the **same silent install/launch/uninstall cycle** that once
+     caught a real bug (Inno Setup leaving a previous version's files
+     behind on upgrade; see ROADMAP.md) as an automated gate rather than
+     a manual step;
+   - computes a combined `SHA256SUMS` and opens the release as a
+     **draft** with all four artifacts attached.
+3. **Review and publish**: check the Actions run, open the draft release
+   under the repo's Releases tab, edit the auto-generated notes if
+   wanted, and click Publish. Nothing goes out without this manual step.
 
-Run the full test suite (`python -m unittest discover tests`, both the
-plain Windows Python and the MSYS2 mingw venv — `internetarchive` is only
-importable in the latter, which is why `core/api.py` has no dedicated
-unit test file) before tagging.
+Re-running: `workflow_dispatch` (Actions tab → Release → Run workflow)
+takes an existing tag name and repeats the whole pipeline — useful if a
+runner-side step failed transiently (e.g. a flaky Flathub mirror) without
+needing a new tag.
+
+`gh release view --json ... /releases/tags/vX.Y.Z` is occasionally flaky
+(GitHub's "Unicorn" transient-error page) even when the release itself is
+fine — if so, verify via `gh api repos/.../releases` (list, not
+tag-lookup) and `gh api repos/.../releases/<id>/assets` instead.
+
+Before the workflow existed, this was a fully manual recipe combining a
+local WSL Ubuntu clone (Linux artifacts) and MSYS2 on the same Windows box
+(Windows artifacts) — kept here in case the workflow ever needs local
+debugging, since the job steps are a direct translation of these commands:
+
+<details>
+<summary>Manual recipe (superseded by the workflow, kept for reference)</summary>
+
+```sh
+# Linux artifacts, in a WSL Ubuntu clone (~/ia_helper-release):
+cd ~/ia_helper-release && git fetch -q origin && git checkout vX.Y.Z
+dpkg-buildpackage -us -uc -b
+flatpak-builder --user --force-clean --repo=flatpak-repo flatpak-build \
+    build-aux/flatpak/io.github.stargazernz.IAHelper.json
+flatpak build-bundle flatpak-repo io.github.stargazernz.IAHelper-X.Y.Z.flatpak \
+    io.github.stargazernz.IAHelper --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo
+```
+
+```sh
+# Windows artifacts, from an MSYS2-capable shell:
+bash build-aux/windows/build.sh   # console smoke test, windowed build, installer
+```
+Then zip the portable tree:
+`Compress-Archive -Path build-aux\windows\dist\ia-helper\* -DestinationPath ia-helper-X.Y.Z-windows-x64-portable.zip`,
+and run the silent install/launch/uninstall cycle:
+```powershell
+.\ia-helper-X.Y.Z-windows-x64-setup.exe /VERYSILENT /SUPPRESSMSGBOXES
+& "$env:LOCALAPPDATA\Programs\IA Helper\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES
+```
+
+```sh
+sha256sum *.deb *.flatpak *-setup.exe *-portable.zip > SHA256SUMS
+gh release create vX.Y.Z --title "IA Helper X.Y.Z" --notes-file notes.md \
+    ia-helper_X.Y.Z_all.deb io.github.stargazernz.IAHelper-X.Y.Z.flatpak \
+    ia-helper-X.Y.Z-windows-x64-setup.exe ia-helper-X.Y.Z-windows-x64-portable.zip \
+    SHA256SUMS --repo stargazerNZ/ia_helper
+```
+
+</details>
 
 ## Going public / Flathub checklist (still pending)
 
