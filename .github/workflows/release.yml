@@ -176,6 +176,14 @@ jobs:
       # real bug (Inno Setup leaving a previous version's files behind on
       # upgrade) — kept as an automated gate rather than relying solely on
       # a human re-running it before every release.
+      #
+      # The installed exe is the WINDOWED (no-console) build — ia-helper.spec
+      # only guarantees --version/stdout on the separate console smoke-test
+      # build it also produces. $LASTEXITCODE is unreliable for a
+      # GUI-subsystem process invoked via `&` (confirmed: it comes back
+      # unset even on a normal run), so "launch" here means confirming the
+      # process actually starts and keeps running rather than crashing
+      # immediately on startup, not checking --version output.
       - name: Install / launch / uninstall verification
         shell: pwsh
         run: |
@@ -187,8 +195,12 @@ jobs:
             throw "install did not produce $installDir\ia-helper.exe"
           }
 
-          & "$installDir\ia-helper.exe" --version
-          if ($LASTEXITCODE -ne 0) { throw "installed exe --version exited $LASTEXITCODE" }
+          $proc = Start-Process -FilePath "$installDir\ia-helper.exe" -PassThru
+          Start-Sleep -Seconds 8
+          if ($proc.HasExited) {
+            throw "installed app exited immediately (exit code $($proc.ExitCode))"
+          }
+          Stop-Process -Id $proc.Id -Force
 
           $uninst = Get-ChildItem -Path $installDir -Filter "unins*.exe" | Select-Object -First 1
           if (-not $uninst) { throw "no uninstaller found in $installDir" }
