@@ -171,6 +171,14 @@ jobs:
         run: |
           Compress-Archive -Path build-aux\windows\dist\ia-helper\* `
               -DestinationPath "ia-helper-$env:VERSION-windows-x64-portable.zip"
+          # Stage the setup exe next to the portable zip at the repo root:
+          # upload-artifact preserves each matched file's path relative to
+          # the common ancestor of ALL patterns, so leaving it under
+          # build-aux/windows/ while the zip sits at the root would nest
+          # it inside a build-aux/ subdirectory in the downloaded artifact
+          # (confirmed: broke sha256sum in the publish job with "build-aux:
+          # Is a directory").
+          Copy-Item "build-aux\windows\ia-helper-$env:VERSION-windows-x64-setup.exe" .
 
       # Mirrors the manual verification in RELEASING.md that once caught a
       # real bug (Inno Setup leaving a previous version's files behind on
@@ -212,7 +220,7 @@ jobs:
         with:
           name: windows-artifacts
           path: |
-            build-aux/windows/ia-helper-*-windows-x64-setup.exe
+            ia-helper-*-windows-x64-setup.exe
             ia-helper-*-windows-x64-portable.zip
           if-no-files-found: error
 
