@@ -17,8 +17,10 @@ from ..core.downloads import (
     FINISHED_STATES,
     DownloadState,
     DownloadTask,
+    verify_download,
 )
 from .format import format_size
+from .worker import run_in_thread
 
 BULK_STATE_LABELS = {
     BulkJobState.RUNNING: "Feeding queue",
@@ -314,6 +316,15 @@ class DownloadsView(Gtk.Box):
         folder.connect("clicked", lambda *_: self._open_file_folder(task))
         row.add_suffix(folder)
 
+        verify = Gtk.Button(
+            icon_name="view-refresh-symbolic",
+            tooltip_text="Verify file integrity",
+            valign=Gtk.Align.CENTER,
+        )
+        verify.add_css_class("flat")
+        verify.connect("clicked", lambda *_: self._verify_task(task, verify))
+        row.add_suffix(verify)
+
         record = {
             "task": task,
             "row": row,
@@ -321,6 +332,7 @@ class DownloadsView(Gtk.Box):
             "toggle": toggle,
             "cancel": cancel,
             "folder": folder,
+            "verify": verify,
         }
         self._file_rows[task.id] = record
         self._update_file_row(record)
@@ -365,6 +377,7 @@ class DownloadsView(Gtk.Box):
 
         record["cancel"].set_visible(task.state not in FINISHED_STATES)
         record["folder"].set_visible(task.state == DownloadState.COMPLETED)
+        record["verify"].set_visible(task.state == DownloadState.COMPLETED)
 
     def _update_group(self, identifier: str):
         group = self._groups.get(identifier)
@@ -468,3 +481,17 @@ class DownloadsView(Gtk.Box):
     def _open_file_folder(self, task: DownloadTask):
         launcher = Gtk.FileLauncher(file=Gio.File.new_for_path(str(task.dest)))
         launcher.open_containing_folder(self.get_root(), None, None)
+
+    def _verify_task(self, task: DownloadTask, button: Gtk.Button):
+        button.set_sensitive(False)
+        run_in_thread(
+            lambda: verify_download(task),
+            lambda result: self._on_verify_done(task, button, result),
+            lambda exc: self._on_verify_done(task, button, (False, str(exc))),
+        )
+
+    def _on_verify_done(self, task: DownloadTask, button: Gtk.Button, result):
+        button.set_sensitive(True)
+        ok, message = result
+        prefix = "Verified" if ok else "Verification failed"
+        self._on_error(f"{task.file_name}: {prefix} — {message}")

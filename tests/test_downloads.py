@@ -6,12 +6,16 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import time
+
 from ia_helper.core.config import Config
 from ia_helper.core.downloads import (
     DownloadManager,
     DownloadState,
     DownloadTask,
+    RateLimiter,
     safe_relative_path,
+    verify_download,
 )
 from ia_helper.core.items import FileEntry
 
@@ -300,6 +304,99 @@ class TestTaskUrl(unittest.TestCase):
             task.url,
             "https://archive.org/download/my%20item/disc%201/track%2001.flac",
         )
+
+
+class TestVerifyDownload(unittest.TestCase):
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmpdir.name)
+
+    def tearDown(self):
+        self._tmpdir.cleanup()
+
+    def _task(self, **kwargs) -> DownloadTask:
+        dest = self.tmp / "file.bin"
+        defaults = dict(
+            identifier="item1", file_name="file.bin", dest=dest,
+            size=len(CONTENT), md5=CONTENT_MD5,
+        )
+        defaults.update(kwargs)
+        return DownloadTask(**defaults)
+
+    def test_intact_file_verifies_ok(self):
+        task = self._task()
+        task.dest.write_bytes(CONTENT)
+        ok, message = verify_download(task)
+        self.assertTrue(ok)
+        self.assertIn("checksum verified", message)
+
+    def test_missing_file_fails(self):
+        task = self._task()
+        ok, message = verify_download(task)
+        self.assertFalse(ok)
+        self.assertIn("missing", message)
+
+    def test_size_mismatch_fails_without_hashing(self):
+        task = self._task()
+        task.dest.write_bytes(CONTENT + b"extra")
+        ok, message = verify_download(task)
+        self.assertFalse(ok)
+        self.assertIn("size mismatch", message)
+
+    def test_corrupted_same_size_file_fails_checksum(self):
+        task = self._task()
+        corrupted = bytearray(CONTENT)
+        corrupted[0] ^= 0xFF
+        task.dest.write_bytes(bytes(corrupted))
+        ok, message = verify_download(task)
+        self.assertFalse(ok)
+        self.assertIn("checksum mismatch", message)
+
+    def test_no_published_md5_checks_size_only(self):
+        task = self._task(md5="")
+        task.dest.write_bytes(CONTENT)
+        ok, message = verify_download(task)
+        self.assertTrue(ok)
+        self.assertIn("no checksum", message)
+
+    def test_self_manifest_skips_size_and_hash_check(self):
+        # size/md5 defaults (from CONTENT) deliberately don't match the
+        # tiny actual file — the manifest exemption must skip both checks.
+        task = self._task(file_name="item1_files.xml", dest=self.tmp / "item1_files.xml")
+        task.dest.write_bytes(b"<xml/>")
+        ok, message = verify_download(task)
+        self.assertTrue(ok)
+        self.assertIn("exempt", message)
+
+
+class TestRateLimiter(unittest.TestCase):
+    def test_unlimited_never_blocks(self):
+        limiter = RateLimiter(0)
+        start = time.monotonic()
+        limiter.consume(10_000_000)
+        self.assertLess(time.monotonic() - start, 0.05)
+
+    def test_within_burst_capacity_does_not_block(self):
+        limiter = RateLimiter(1_000_000)  # 1 MB/s, so a fresh bucket holds 1 MB
+        start = time.monotonic()
+        limiter.consume(500_000)
+        self.assertLess(time.monotonic() - start, 0.05)
+
+    def test_set_rate_to_zero_makes_it_unlimited_again(self):
+        limiter = RateLimiter(1)
+        limiter.set_rate(0)
+        start = time.monotonic()
+        limiter.consume(10_000_000)
+        self.assertLess(time.monotonic() - start, 0.05)
+
+    def test_exceeding_burst_capacity_blocks_roughly_the_expected_time(self):
+        limiter = RateLimiter(1_000_000)  # 1 MB/s, 1 MB burst capacity
+        limiter.consume(1_000_000)  # drain the initial bucket
+        start = time.monotonic()
+        limiter.consume(250_000)  # needs ~0.25s more tokens to refill
+        elapsed = time.monotonic() - start
+        self.assertGreater(elapsed, 0.15)
+        self.assertLess(elapsed, 0.6)
 
 
 if __name__ == "__main__":

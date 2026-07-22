@@ -15,7 +15,9 @@
 
 Post-MVP additions along the way: access-restriction handling
 (lending-library items, private files), DRM labelling with Select-all
-exclusion, uploader grouping, thumbnail queue cancellation fixes.
+exclusion, uploader grouping, thumbnail queue cancellation fixes,
+downloads QoL (shared bandwidth ceiling, queue-drained desktop
+notification, on-demand file re-verification — 2026-07-22).
 
 ## Going public (Flathub, discoverability)
 
@@ -59,10 +61,6 @@ A date-range filter and a field-query builder for users who don't know
 Lucene syntax. The controls row is near capacity (entry, mediatype,
 language, sort, search, bulk) — the next filter added should move the
 filters into a popover.
-
-### Downloads QoL
-Optional bandwidth limit; desktop notification on queue completion;
-re-verify a completed file on demand.
 
 ### Windows port — shipped (1.3.1)
 Runs via MSYS2 GTK4 + libadwaita; platform-aware app dirs and NTFS-safe

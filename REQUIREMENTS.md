@@ -98,6 +98,19 @@ box:
 - **R5.8** The downloads view must group tasks by item (title, aggregate
   file count/size/progress) with group-level pause/resume/cancel and an
   "open item folder" action; per-file controls remain inside each group.
+- **R5.9** An optional bandwidth ceiling (KB/s, 0 = unlimited) must be
+  available in Preferences, applied across the whole queue's combined
+  throughput rather than per file, and take effect on already-running
+  transfers immediately.
+- **R5.10** A desktop notification must fire once the download queue (and
+  any running bulk job) drains to empty, summarizing how many files
+  finished and how many failed since the previous notification — not a
+  per-file notification, and not fired for an already-empty queue or a
+  bulk job's transient between-batch lulls.
+- **R5.11** A completed file must be re-verifiable on demand (re-hashing
+  from disk against its recorded size/MD5, independent of the original
+  download), surfacing the result without changing the task's stored
+  state.
 
 ## 6. Internet Archive citizenship
 

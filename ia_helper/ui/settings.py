@@ -9,7 +9,7 @@ from ..core.config import MAX_CONCURRENT_LIMIT, Config, save_config
 
 
 class PreferencesDialog(Adw.PreferencesDialog):
-    def __init__(self, config: Config, on_concurrency_changed,
+    def __init__(self, config: Config, on_concurrency_changed, on_bandwidth_changed,
                  account: AccountInfo | None, on_sign_in, on_sign_out):
         """``on_sign_in(email, password, on_done)`` performs the sign-in off
         the main loop and calls ``on_done(info, exc)`` back on it;
@@ -17,6 +17,7 @@ class PreferencesDialog(Adw.PreferencesDialog):
         super().__init__(title="Preferences")
         self._config = config
         self._on_concurrency_changed = on_concurrency_changed
+        self._on_bandwidth_changed = on_bandwidth_changed
         self._account = account
         self._on_sign_in = on_sign_in
         self._on_sign_out = on_sign_out
@@ -65,6 +66,20 @@ class PreferencesDialog(Adw.PreferencesDialog):
         )
         spin.connect("notify::value", self._on_concurrency_spun)
         group.add(spin)
+
+        bandwidth = Adw.SpinRow(
+            title="Bandwidth limit",
+            subtitle="Kilobytes per second, shared across all downloads · 0 = unlimited",
+            adjustment=Gtk.Adjustment(
+                lower=0,
+                upper=1_000_000,
+                step_increment=64,
+                page_increment=1024,
+                value=self._config.bandwidth_limit_kbps,
+            ),
+        )
+        bandwidth.connect("notify::value", self._on_bandwidth_spun)
+        group.add(bandwidth)
         return group
 
     def _on_choose_folder(self, _button):
@@ -88,6 +103,13 @@ class PreferencesDialog(Adw.PreferencesDialog):
             self._config.max_concurrent_downloads = value
             save_config(self._config)
             self._on_concurrency_changed(value)
+
+    def _on_bandwidth_spun(self, row, _param):
+        value = int(row.get_value())
+        if value != self._config.bandwidth_limit_kbps:
+            self._config.bandwidth_limit_kbps = value
+            save_config(self._config)
+            self._on_bandwidth_changed(value)
 
     # -- account ------------------------------------------------------------
 

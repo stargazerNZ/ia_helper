@@ -1,12 +1,12 @@
-from gi.repository import Adw, Gio, Gtk
+from gi.repository import Adw, Gio, GLib, Gtk
 
 from .. import APP_ID, APP_NAME, PROJECT_URL, __version__
 from ..core import account
 from ..core.api import create_session
-from ..core.bulk import BulkManager
+from ..core.bulk import BulkJobState, BulkManager
 from ..core.scrape import ScrapeClient
 from ..core.config import load_config
-from ..core.downloads import DownloadManager
+from ..core.downloads import DownloadManager, DownloadState
 from ..core.items import ItemClient, ItemDetails
 from ..core.search import SearchClient, SearchResult
 from ..core.thumbnails import ThumbnailLoader
@@ -16,6 +16,8 @@ from .item_view import ItemView
 from .search_view import SearchView
 from .settings import PreferencesDialog
 from .worker import run_in_thread
+
+_ACTIVE_DOWNLOAD_STATES = (DownloadState.RUNNING, DownloadState.QUEUED)
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -40,6 +42,12 @@ class MainWindow(Adw.ApplicationWindow):
         self._bulk_manager = BulkManager(
             self._scrape_client, self._item_client, self._manager
         )
+        # Fires a desktop notification once the queue drains to empty AND
+        # no bulk job is still feeding it — not per-file, and not on every
+        # transient empty moment between a bulk job's feed batches.
+        self._downloads_active = False
+        self._downloads_baseline = (0, 0)  # (completed, failed) before this run
+        self._manager.add_listener(self._on_download_progress_threaded)
 
         self._navigation = Adw.NavigationView()
 
@@ -212,6 +220,46 @@ class MainWindow(Adw.ApplicationWindow):
         toast.connect("button-clicked", lambda *_: self.show_downloads())
         self._toast_overlay.add_toast(toast)
 
+    def _on_download_progress_threaded(self, _task) -> None:
+        GLib.idle_add(self._on_download_progress)
+
+    def _on_download_progress(self) -> None:
+        tasks = self._manager.tasks()
+        active = any(t.state in _ACTIVE_DOWNLOAD_STATES for t in tasks)
+        bulk_running = any(
+            job.state == BulkJobState.RUNNING for job in self._bulk_manager.jobs()
+        )
+        if active or bulk_running:
+            if not self._downloads_active:
+                self._downloads_active = True
+                self._downloads_baseline = self._finished_counts(tasks)
+            return
+        if self._downloads_active:
+            self._downloads_active = False
+            self._send_completion_notification(tasks)
+
+    @staticmethod
+    def _finished_counts(tasks) -> tuple[int, int]:
+        completed = sum(1 for t in tasks if t.state == DownloadState.COMPLETED)
+        failed = sum(1 for t in tasks if t.state == DownloadState.FAILED)
+        return completed, failed
+
+    def _send_completion_notification(self, tasks) -> None:
+        completed, failed = self._finished_counts(tasks)
+        base_completed, base_failed = self._downloads_baseline
+        new_completed = max(0, completed - base_completed)
+        new_failed = max(0, failed - base_failed)
+        if not new_completed and not new_failed:
+            return  # queue emptied without anything actually finishing
+        bits = []
+        if new_completed:
+            bits.append(f"{new_completed} file{'s' if new_completed != 1 else ''} downloaded")
+        if new_failed:
+            bits.append(f"{new_failed} failed")
+        notification = Gio.Notification.new("Downloads complete")
+        notification.set_body(" · ".join(bits))
+        self.get_application().send_notification(None, notification)
+
     # -- account ------------------------------------------------------------
 
     def _set_account(self, info) -> None:
@@ -267,6 +315,7 @@ class MainWindow(Adw.ApplicationWindow):
         dialog = PreferencesDialog(
             self._config,
             on_concurrency_changed=self._manager.set_max_concurrent,
+            on_bandwidth_changed=self._manager.set_bandwidth_limit,
             account=self._account,
             on_sign_in=self.sign_in,
             on_sign_out=self.sign_out,

@@ -173,6 +173,75 @@ class DownloadTask:
         return task
 
 
+def verify_download(task: DownloadTask) -> tuple[bool, str]:
+    """Re-check a completed file against its recorded size/MD5, reading it
+    fresh from disk. Blocking — call from a worker thread.
+
+    Independent of the download path itself: catches on-disk corruption
+    or tampering after the fact, not just a bad transfer.
+    """
+    if not task.dest.exists():
+        return False, "file is missing"
+    actual_size = task.dest.stat().st_size
+    if task.is_self_manifest:
+        # Its listed size/md5 are inherently stale (see is_self_manifest),
+        # same exemption as at download-finalize time.
+        return True, f"present ({actual_size:,} bytes); manifest is exempt from verification"
+    if task.size and actual_size != task.size:
+        return False, f"size mismatch ({actual_size:,} bytes, expected {task.size:,})"
+    if not task.md5:
+        return True, f"size matches ({actual_size:,} bytes); no checksum to verify"
+    digest = hashlib.md5()
+    with task.dest.open("rb") as f:
+        while chunk := f.read(CHUNK_SIZE):
+            digest.update(chunk)
+    if digest.hexdigest() != task.md5:
+        return False, "checksum mismatch"
+    return True, "checksum verified"
+
+
+class RateLimiter:
+    """Token bucket shared by every running download worker.
+
+    One instance per DownloadManager, not per task — a single ceiling
+    applies to the whole queue's combined throughput, matching the
+    Preferences setting. ``rate_bytes_per_sec <= 0`` means unlimited, in
+    which case ``consume()`` is a no-op. Sleeps happen in short slices so
+    a paused/cancelled task's worker notices promptly rather than
+    oversleeping mid-throttle.
+    """
+
+    _MAX_SLEEP = 0.25
+
+    def __init__(self, rate_bytes_per_sec: int = 0):
+        self._lock = threading.Lock()
+        self._rate = max(0, rate_bytes_per_sec)
+        self._tokens = float(self._rate)
+        self._last = time.monotonic()
+
+    def set_rate(self, rate_bytes_per_sec: int) -> None:
+        with self._lock:
+            self._rate = max(0, rate_bytes_per_sec)
+            self._tokens = float(self._rate)
+            self._last = time.monotonic()
+
+    def consume(self, n: int) -> None:
+        while True:
+            with self._lock:
+                if self._rate <= 0:
+                    return
+                now = time.monotonic()
+                self._tokens = min(
+                    float(self._rate), self._tokens + (now - self._last) * self._rate
+                )
+                self._last = now
+                if self._tokens >= n:
+                    self._tokens -= n
+                    return
+                wait = min((n - self._tokens) / self._rate, self._MAX_SLEEP)
+            time.sleep(wait)
+
+
 class DownloadManager:
     """Owns the queue and its worker threads. Thread-safe public methods."""
 
@@ -187,6 +256,7 @@ class DownloadManager:
         self._listeners: list = []
         self._structure_listeners: list = []
         self._shutdown = False
+        self._rate_limiter = RateLimiter(config.bandwidth_limit_kbps * 1024)
         self._load()
         if autostart:
             self._maybe_start()
@@ -318,6 +388,14 @@ class DownloadManager:
             self.config.max_concurrent_downloads = value
         if self.autostart:
             self._maybe_start()
+
+    def set_bandwidth_limit(self, kbps: int) -> None:
+        """``kbps`` <= 0 means unlimited. Applies to already-running
+        transfers immediately, not just future ones."""
+        kbps = max(0, kbps)
+        with self._lock:
+            self.config.bandwidth_limit_kbps = kbps
+        self._rate_limiter.set_rate(kbps * 1024)
 
     def shutdown(self) -> None:
         """Ask running workers to stop and persist the queue."""
@@ -461,6 +539,7 @@ class DownloadManager:
                 out.write(chunk)
                 digest.update(chunk)
                 task.downloaded += len(chunk)
+                self._rate_limiter.consume(len(chunk))
 
                 now = time.monotonic()
                 if now - last_notify >= PROGRESS_INTERVAL:

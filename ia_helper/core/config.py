@@ -68,12 +68,15 @@ def default_download_dir() -> Path:
 class Config:
     download_dir: Path = field(default_factory=default_download_dir)
     max_concurrent_downloads: int = 3
+    # Shared across all concurrent downloads (not per-file); 0 = unlimited.
+    bandwidth_limit_kbps: int = 0
 
     def normalized(self) -> "Config":
         self.download_dir = Path(self.download_dir).expanduser()
         self.max_concurrent_downloads = max(
             1, min(MAX_CONCURRENT_LIMIT, int(self.max_concurrent_downloads))
         )
+        self.bandwidth_limit_kbps = max(0, int(self.bandwidth_limit_kbps))
         return self
 
 
@@ -95,6 +98,11 @@ def load_config(path: Path | None = None) -> Config:
             config.max_concurrent_downloads = int(raw["max_concurrent_downloads"])
         except (TypeError, ValueError):
             pass
+    if "bandwidth_limit_kbps" in raw:
+        try:
+            config.bandwidth_limit_kbps = int(raw["bandwidth_limit_kbps"])
+        except (TypeError, ValueError):
+            pass
     return config.normalized()
 
 
@@ -104,5 +112,6 @@ def save_config(config: Config, path: Path | None = None) -> None:
     payload = {
         "download_dir": str(config.download_dir),
         "max_concurrent_downloads": config.max_concurrent_downloads,
+        "bandwidth_limit_kbps": config.bandwidth_limit_kbps,
     }
     path.write_text(json.dumps(payload, indent=2))

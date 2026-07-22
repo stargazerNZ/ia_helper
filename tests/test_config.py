@@ -47,6 +47,17 @@ class TestConfig(unittest.TestCase):
         config = Config(max_concurrent_downloads=0).normalized()
         self.assertEqual(config.max_concurrent_downloads, 1)
 
+    def test_bandwidth_limit_round_trip(self):
+        config = Config(bandwidth_limit_kbps=512)
+        save_config(config, self.path)
+        loaded = load_config(self.path)
+        self.assertEqual(loaded.bandwidth_limit_kbps, 512)
+
+    def test_bandwidth_limit_defaults_unlimited_and_clamps_negative(self):
+        self.assertEqual(load_config(self.path).bandwidth_limit_kbps, 0)
+        config = Config(bandwidth_limit_kbps=-5).normalized()
+        self.assertEqual(config.bandwidth_limit_kbps, 0)
+
 
 class TestPlatformDirs(unittest.TestCase):
     def test_unix_uses_xdg(self):

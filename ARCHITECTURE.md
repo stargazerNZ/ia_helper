@@ -29,7 +29,9 @@ ia_helper/
     thumbnails.py          thumbnail fetch: 2-worker pool, disk cache,
                            generation counter + cancellable futures
     downloads.py           DownloadManager: queue, bounded workers, Range
-                           resume, streaming MD5 verify, JSON persistence
+                           resume, streaming MD5 verify, JSON persistence,
+                           shared bandwidth-ceiling token bucket
+                           (RateLimiter), on-demand re-verify (verify_download)
     account.py             sign-in via internetarchive.configure() (S3 keys;
                            password never stored), check_auth who-am-i,
                            sign-out (credential sections removed from ia.ini)
@@ -42,7 +44,8 @@ ia_helper/
   ui/                      GTK4/libadwaita; no direct archive.org access
     window.py              MainWindow: NavigationView (root ⇄ item pages),
                            Search/Downloads ViewStack, app menu, actions,
-                           shared session/client construction, About
+                           shared session/client construction, About,
+                           queue-drained desktop notification
     search_view.py         query entry + mediatype filter, ListView results,
                            paging, error/retry page, thumbnail lifecycle
     item_view.py           item page: metadata header, restriction banner,
@@ -55,7 +58,7 @@ ia_helper/
                            size/item-count/format-coverage shown before
                            anything is queued
     settings.py            Adw.PreferencesDialog: download dir, concurrency,
-                           account sign-in/out
+                           bandwidth limit, account sign-in/out
     format.py              size formatting
     worker.py              run_in_thread(): worker thread → GLib.idle_add
   main.py                  Adw.Application: actions, accelerators, --version
@@ -81,7 +84,12 @@ GTK owns the main loop; nothing in `core/` may run on it.
   (`_maybe_start`). Pause/cancel are per-task `threading.Event`s checked
   each chunk. Manager listeners fire **on worker threads**; the downloads
   view trampolines every event through `GLib.idle_add` before touching
-  widgets, updating rows via a `rev` property that bound rows watch.
+  widgets, updating rows via a `rev` property that bound rows watch. A
+  single `RateLimiter` token bucket lives on the manager (not per task),
+  so the Preferences bandwidth ceiling caps the queue's *combined*
+  throughput regardless of how many files are running at once; every
+  worker calls `consume()` after each chunk, sleeping in short slices so
+  pause/cancel stay responsive even while throttled.
 
 ## Data flow (typical journey)
 
@@ -184,6 +192,23 @@ the whole file. The `.part` is renamed to its final name only after size
 and checksum verification — the filesystem never contains a final-named
 file that isn't verified. A server that ignores a Range request (HTTP 200)
 triggers a clean restart; HTTP 416 with a full-sized partial finalizes it.
+
+`verify_download()` re-runs the same size/MD5 check against a completed
+file already on disk, on demand (a "Verify" action per row in the
+downloads view) — this catches on-disk corruption or tampering after the
+fact, independent of the original transfer, and never changes the task's
+stored state regardless of the result.
+
+The downloads-complete desktop notification (`MainWindow`) fires once the
+queue *drains* to empty, not per file: a `_downloads_active` flag flips on
+when anything is RUNNING/QUEUED or a bulk job is RUNNING, and flips off
+(firing the notification) only on the transition back to fully idle. A
+baseline snapshot of completed/failed counts taken at the *start* of each
+active run lets the notification report only what finished *this* run,
+not the lifetime totals still sitting in the (unpruned) finished-task
+history. Bulk jobs feed the queue in batches and can leave it transiently
+empty between them — the bulk-job-RUNNING check prevents that from
+firing a premature "complete" notification mid-job.
 
 ## Restriction handling
 
