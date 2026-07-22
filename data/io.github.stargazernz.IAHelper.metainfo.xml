@@ -37,6 +37,14 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.3.4" date="2026-07-22">
+      <description>
+        <p>Downloads: an optional bandwidth limit shared across the whole
+        queue, a desktop notification once the queue (and any bulk job)
+        finishes, and an on-demand re-verify action for completed
+        files.</p>
+      </description>
+    </release>
     <release version="1.3.3" date="2026-07-18">
       <description>
         <p>Windows: faster launch. The bundle shipped ~75 introspection

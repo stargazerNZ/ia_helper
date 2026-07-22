@@ -1,3 +1,13 @@
+ia-helper (1.3.4) unstable; urgency=medium
+
+  * Downloads: optional bandwidth limit (KB/s), shared across the whole
+    queue rather than per file.
+  * Downloads: a desktop notification once the queue (and any bulk job)
+    finishes, summarizing files completed/failed since the last one.
+  * Downloads: re-verify a completed file's checksum on demand.
+
+ -- Joe Hallmark <joe.hallmark@gmail.com>  Wed, 22 Jul 2026 09:00:00 +1200
+
 ia-helper (1.3.3) unstable; urgency=medium
 
   * Windows: faster launch. Trimmed the bundled GObject-Introspection

@@ -1,6 +1,6 @@
 """IA Helper — a GTK4 helper for the Internet Archive."""
 
-__version__ = "1.3.3"
+__version__ = "1.3.4"
 
 APP_ID = "io.github.stargazernz.IAHelper"
 APP_NAME = "IA Helper"
