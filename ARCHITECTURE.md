@@ -89,7 +89,14 @@ GTK owns the main loop; nothing in `core/` may run on it.
   so the Preferences bandwidth ceiling caps the queue's *combined*
   throughput regardless of how many files are running at once; every
   worker calls `consume()` after each chunk, sleeping in short slices so
-  pause/cancel stay responsive even while throttled.
+  pause/cancel stay responsive even while throttled — `consume()` takes
+  a `stop_check` callable checked each slice, since without it a
+  cancelled task's worker would just keep waiting out the full throttle
+  before ever re-checking. Bucket capacity is floored at `CHUNK_SIZE`,
+  not the configured rate: live-verified that a rate below `CHUNK_SIZE`
+  bytes/sec (routine at low KB/s settings) otherwise made `consume()`
+  wait forever for a whole-chunk request the capped bucket could never
+  grant — a real hang shipped in 1.3.4, not just a slow transfer.
 
 ## Data flow (typical journey)
 

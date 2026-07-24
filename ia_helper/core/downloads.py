@@ -209,6 +209,13 @@ class RateLimiter:
     which case ``consume()`` is a no-op. Sleeps happen in short slices so
     a paused/cancelled task's worker notices promptly rather than
     oversleeping mid-throttle.
+
+    Bucket capacity is floored at CHUNK_SIZE, not just the rate: a single
+    ``consume()`` call is always for one whole chunk (up to CHUNK_SIZE,
+    per ``response.iter_content(CHUNK_SIZE)``), and capacity below that
+    would mean ``self._tokens >= n`` could never become true for a rate
+    configured below CHUNK_SIZE bytes/sec — live-verified to hang a
+    worker forever, not just throttle it, before this floor was added.
     """
 
     _MAX_SLEEP = 0.25
@@ -216,29 +223,37 @@ class RateLimiter:
     def __init__(self, rate_bytes_per_sec: int = 0):
         self._lock = threading.Lock()
         self._rate = max(0, rate_bytes_per_sec)
-        self._tokens = float(self._rate)
+        self._capacity = max(self._rate, CHUNK_SIZE)
+        self._tokens = float(self._capacity)
         self._last = time.monotonic()
 
     def set_rate(self, rate_bytes_per_sec: int) -> None:
         with self._lock:
             self._rate = max(0, rate_bytes_per_sec)
-            self._tokens = float(self._rate)
+            self._capacity = max(self._rate, CHUNK_SIZE)
+            self._tokens = float(self._capacity)
             self._last = time.monotonic()
 
-    def consume(self, n: int) -> None:
+    def consume(self, n: int, stop_check=None) -> None:
+        """Block until ``n`` bytes are within the rate, or ``stop_check()``
+        (checked once per short sleep slice) returns True — a paced chunk
+        must never make a cancel/pause request wait out the full throttle
+        before it's noticed."""
         while True:
             with self._lock:
                 if self._rate <= 0:
                     return
                 now = time.monotonic()
                 self._tokens = min(
-                    float(self._rate), self._tokens + (now - self._last) * self._rate
+                    float(self._capacity), self._tokens + (now - self._last) * self._rate
                 )
                 self._last = now
                 if self._tokens >= n:
                     self._tokens -= n
                     return
                 wait = min((n - self._tokens) / self._rate, self._MAX_SLEEP)
+            if stop_check is not None and stop_check():
+                return
             time.sleep(wait)
 
 
@@ -538,8 +553,13 @@ class DownloadManager:
                     return
                 out.write(chunk)
                 digest.update(chunk)
+                self._rate_limiter.consume(
+                    len(chunk),
+                    stop_check=lambda: (
+                        task._cancel.is_set() or task._pause.is_set() or self._shutdown
+                    ),
+                )
                 task.downloaded += len(chunk)
-                self._rate_limiter.consume(len(chunk))
 
                 now = time.monotonic()
                 if now - last_notify >= PROGRESS_INTERVAL:

@@ -19,9 +19,20 @@ exclusion, uploader grouping, thumbnail queue cancellation fixes,
 downloads QoL (shared bandwidth ceiling, queue-drained desktop
 notification, on-demand file re-verification — 2026-07-22).
 
+**Known issue, fixed but not yet released:** the bandwidth-limit token
+bucket shipped in 1.3.4 capped its capacity at the configured rate, so
+any transfer chunk larger than one second's worth of that rate (routine
+for a small file at a low KB/s setting) could never be granted —
+_a permanent hang, not just throttling_, and worse, not cancellable
+either since the wait wasn't interruptible. Fixed in `core/downloads.py`
+(capacity floored at `CHUNK_SIZE`; `consume()` takes a `stop_check` so
+cancel/pause interrupt a throttled wait) with regression tests added.
+Next release should carry this fix; until then, avoid setting the
+bandwidth limit below ~256 KB/s.
+
 ## Going public (Flathub, discoverability)
 
-GitHub releases have been shipping normally since v1.0.0 (now at 1.3.3);
+GitHub releases have been shipping normally since v1.0.0 (now at 1.3.4);
 this checklist is specifically about the repo going public and reaching
 Flathub — see [RELEASING.md](RELEASING.md) for the full ordered
 procedure. Status:
@@ -29,8 +40,8 @@ procedure. Status:
 1. **License** ✓ — GPL-3.0-or-later; LICENSE file added, metainfo,
    debian/copyright, and pyproject in sync.
 2. **Icon** ✓ — redrawn flat SVG (replaceable later without ceremony).
-3. **Screenshots** — take on the VM per RELEASING.md §1; metainfo slots
-   are wired to `data/screenshots/*.png`.
+3. **Screenshots** ✓ — see RELEASING.md §1; committed at
+   `data/screenshots/*.png`, matching the metainfo slots.
 4. **Repo public** — GitHub settings; required for Flathub app-ID
    verification and screenshot URLs.
 5. **Submit to Flathub** — manifest ready in `build-aux/flathub/`,

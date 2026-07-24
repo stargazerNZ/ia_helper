@@ -10,6 +10,7 @@ import time
 
 from ia_helper.core.config import Config
 from ia_helper.core.downloads import (
+    CHUNK_SIZE,
     DownloadManager,
     DownloadState,
     DownloadTask,
@@ -397,6 +398,29 @@ class TestRateLimiter(unittest.TestCase):
         elapsed = time.monotonic() - start
         self.assertGreater(elapsed, 0.15)
         self.assertLess(elapsed, 0.6)
+
+    def test_capacity_floored_at_chunk_size_even_for_low_rates(self):
+        # A rate below CHUNK_SIZE bytes/sec must not cap the bucket below
+        # CHUNK_SIZE: a single consume() call is for one whole download
+        # chunk (up to CHUNK_SIZE), and a lower cap means self._tokens
+        # could never reach n — live-verified as a PERMANENT hang (not
+        # just throttling) before this floor was added, since a small
+        # file's entire content can arrive as one chunk larger than a
+        # low-KB/s rate's "1 second of bytes".
+        limiter = RateLimiter(1024)  # 1 KB/s — far below CHUNK_SIZE
+        self.assertGreaterEqual(limiter._capacity, CHUNK_SIZE)
+        limiter._tokens = float(limiter._capacity)  # bucket already full
+        start = time.monotonic()
+        limiter.consume(CHUNK_SIZE)
+        self.assertLess(time.monotonic() - start, 0.05)
+
+    def test_consume_interrupted_by_stop_check(self):
+        limiter = RateLimiter(1)  # 1 byte/s: would otherwise block for ages
+        limiter.consume(limiter._capacity)  # drain it
+        start = time.monotonic()
+        limiter.consume(1000, stop_check=lambda: True)
+        # Must bail within roughly one sleep slice, not wait out the throttle.
+        self.assertLess(time.monotonic() - start, RateLimiter._MAX_SLEEP + 0.1)
 
 
 if __name__ == "__main__":

@@ -19,6 +19,11 @@ artifacts, tested and verified, opened as a draft for review — see
 discoverable (repo is still private); see
 [ROADMAP.md](ROADMAP.md) for what's next.
 
+**Latest release:** [v1.3.4](https://github.com/stargazerNZ/ia_helper/releases/tag/v1.3.4)
+adds downloads quality-of-life — an optional bandwidth limit shared across
+the queue, a desktop notification when downloads finish, and an on-demand
+re-verify action for completed files.
+
 Licensed under the [GPL-3.0-or-later](LICENSE).
 
 ## Documentation

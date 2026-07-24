@@ -88,20 +88,23 @@ A one-time sequence, independent of which version is current — no need
 to redo a GitHub release for this, it builds from whatever tag already
 exists once the repo goes public.
 
-### 1. Screenshots (on the Linux VM)
-
-Take three window screenshots (Alt+PrintScreen in GNOME captures the
-focused window, saved to ~/Pictures/Screenshots), showing:
+### 1. Screenshots ✓
 
 | File | Content |
 |---|---|
-| `data/screenshots/search.png` | Search results for something visual (e.g. `collection:prelinger`) |
+| `data/screenshots/search.png` | Search results for `collection:prelinger` |
 | `data/screenshots/item.png` | An item page with a few files selected |
 | `data/screenshots/downloads.png` | The downloads view with a couple of item groups in flight |
 
-Guidelines: default window size or larger, light or dark consistently,
-no personal info visible (sign out or avoid the menu). Commit them at
-exactly those paths — the metainfo `<screenshots>` URLs point there.
+Captured 2026-07-24 from the installed Windows build rather than the
+Linux VM (same GTK4/libadwaita/Adwaita theme either way — the only
+difference is window-chrome styling), maximized at native 3840×2160 with
+the OS taskbar cropped out. If retaken later, the original plan still
+works: three window screenshots on the VM (Alt+PrintScreen in GNOME,
+saved to ~/Pictures/Screenshots), default size or larger, light or dark
+consistently, no personal info visible (sign out or avoid the menu).
+Commit them at exactly those paths — the metainfo `<screenshots>` URLs
+point there.
 
 ### 2. Validate (on the VM)
 
